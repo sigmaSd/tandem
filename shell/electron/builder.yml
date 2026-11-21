@@ -1,0 +1,71 @@
+# Packaging Tandem (`vp run dist`, after `vp build` and `vp pack`): electron-builder, into dist/packages/.
+# The package holds Electron, the bundled main process (dist/app/), the built window (app/ui/dist/), the icon
+# and the translations — no node_modules: everything is bundled.
+# Linux packages are built on Linux; Windows and macOS ones on those systems (or in CI, one runner each:
+# .github/workflows/release.yml). Only the Linux AppImage has been run so far (November 2026).
+
+appId: io.github.sigmasd.tandem
+productName: Tandem
+copyright: Copyright © 2026 Bedis Nbiba
+directories:
+  output: dist/packages
+files:
+  - dist/app/**
+  - app/ui/dist/**
+  - app/icon.png
+  - package.json
+  - locales/app/*.po # the translations (src/locales.ts reads them at start)
+  - "!**/node_modules/**"
+asar: true
+
+linux:
+  target: [AppImage, deb, rpm]
+  category: Utility
+  icon: app/icon.png
+  executableName: tandem
+  maintainer: Bedis Nbiba
+  synopsis: Keep a folder the same on several computers, without the cloud
+  description: Sync one folder between your computers over the local network or with a USB drive. Every change is shown before it is made, and nothing is overwritten without a copy kept.
+  syncDesktopName: true # the window belongs to tandem.desktop (package.json desktopName)
+  desktop:
+    entry:
+      Name: Tandem
+      Comment: Keep a folder the same on several computers, without the cloud
+      Keywords: sync;folder;backup;usb;
+appImage:
+  artifactName: Tandem-${version}-${arch}.AppImage
+# the current AppImage runtime (libfuse 3 built in), as in MedStation: the old default needs FUSE 2, gone from Fedora
+toolsets:
+  appimage: "1.0.3"
+deb:
+  artifactName: tandem_${version}_${arch}.deb
+rpm:
+  artifactName: tandem-${version}.${arch}.rpm
+
+win:
+  target: nsis
+  icon: app/icon.png
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: Tandem-${version}-setup.exe
+
+mac:
+  target: [dmg, zip] # the zip is what automatic updates download
+  category: public.app-category.utilities
+  icon: app/icon.png
+  # Not signed with a developer certificate (users open it once with right-click → Open). Ad-hoc signed ("-")
+  # because Apple Silicon refuses to run an app with no signature at all; without the hardened runtime, which
+  # with an ad-hoc signature rejects Electron's own frameworks (electron-builder's docs).
+  identity: "-"
+  hardenedRuntime: false
+
+# Automatic updates (shell/electron/updates.ts) need to know where the published versions are: still to
+# choose. Once a public repository holds the releases, for example:
+#   publish:
+#     provider: github
+#     owner: <owner>
+#     repo: tandem
+#     releaseType: draft # CI publishes it once every system's build is in (.github/workflows/release.yml)
+# Without it, the app never looks for updates and never contacts anything outside the local network.

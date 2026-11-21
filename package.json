@@ -1,0 +1,33 @@
+{
+  "name": "tandem",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Keep one folder the same on several computers, over the local network or a USB drive, with nothing in the cloud",
+  "author": "Bedis Nbiba",
+  "type": "module",
+  "main": "dist/app/electron.mjs",
+  "scripts": {
+    "dev": "vp build && vp pack && electron . --dev",
+    "start": "electron .",
+    "browser": "vp build && node tools/dev.ts",
+    "dist": "vp build && vp pack && electron-builder --config shell/electron/builder.yml",
+    "appimage": "vp build && vp pack && electron-builder --config shell/electron/builder.yml --linux AppImage",
+    "install-app": "vp run appimage && node tools/install.ts"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.11"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "electron": "45.3.4",
+    "electron-builder": "26.18.0",
+    "typescript": "^7.0.2",
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": ">=24.11"
+  },
+  "packageManager": "pnpm@12.11.2",
+  "desktopName": "tandem.desktop",
+  "productName": "Tandem"
+}

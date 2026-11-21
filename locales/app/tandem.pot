@@ -1,0 +1,833 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Tandem\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgctxt "chooseFolderTitle"
+msgid "Folder to keep in sync"
+msgstr ""
+
+msgctxt "chooseDriveTitle"
+msgid "Folder on the drive"
+msgstr ""
+
+msgctxt "errNoFolder"
+msgid "Choose the folder to keep in sync first."
+msgstr ""
+
+msgctxt "errFolder"
+msgid "The folder {path} can't be opened: {error}"
+msgstr ""
+
+msgctxt "errInsideOwn"
+msgid "That folder belongs to Tandem itself. Choose another one."
+msgstr ""
+
+msgctxt "errSameFolder"
+msgid "That is the synced folder itself. Choose a folder on the drive."
+msgstr ""
+
+msgctxt "errNested"
+msgid "The two folders are one inside the other. Choose a folder outside the synced folder."
+msgstr ""
+
+msgctxt "errBusy"
+msgid "A sync is already running. Wait for it to end."
+msgstr ""
+
+msgctxt "errStale"
+msgid "{name} synced with this computer since the comparison. Compare again."
+msgstr ""
+
+msgctxt "errUnreachable"
+msgid "{name} did not answer. Check that it is on, on the same network, and that Tandem is open there."
+msgstr ""
+
+msgctxt "errRefused"
+msgid "{name} no longer recognizes this computer. Remove it here, then pair the two again."
+msgstr ""
+
+msgctxt "errNoFolderThere"
+msgid "{name} has no folder chosen yet. Choose one in Tandem there first."
+msgstr ""
+
+msgctxt "errNotPlugged"
+msgid "{name} is not plugged in."
+msgstr ""
+
+msgctxt "errEmptiedHere"
+msgid "The folder on this computer is empty, and it held {n} file at the last sync. Tandem stops here rather than delete it on the other side. If the folder is on a disk, check that the disk is there."
+msgid_plural "The folder on this computer is empty, and it held {n} files at the last sync. Tandem stops here rather than delete them on the other side. If the folder is on a disk, check that the disk is there."
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "errEmptiedThere"
+msgid "The folder on {name} is empty, and it held {n} file at the last sync. Tandem stops here rather than delete it on this computer. If you emptied it on purpose, remove this copy in Settings and add it again."
+msgid_plural "The folder on {name} is empty, and it held {n} files at the last sync. Tandem stops here rather than delete them on this computer. If you emptied it on purpose, remove this copy in Settings and add it again."
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "errBadCode"
+msgid "A code has 12 letters and digits, like K7QF-2M9X-TB4H."
+msgstr ""
+
+msgctxt "errWrongCode"
+msgid "That is not the code shown on the other computer."
+msgstr ""
+
+msgctxt "errNotPairing"
+msgid "The other computer is not showing a code. Choose “Show a code” there first."
+msgstr ""
+
+msgctxt "errNoTandemAt"
+msgid "No Tandem answered at {address}."
+msgstr ""
+
+msgctxt "errVersion"
+msgid "The other computer runs another version of Tandem. Update both."
+msgstr ""
+
+msgctxt "errSelf"
+msgid "That is this computer."
+msgstr ""
+
+msgctxt "errGoneMeanwhile"
+msgid "This file changed since the comparison. Compare again."
+msgstr ""
+
+msgctxt "couldNotStart"
+msgid "Tandem could not start: {error}"
+msgstr ""
+
+msgctxt "syncRunningTitle"
+msgid "A sync is running"
+msgstr ""
+
+msgctxt "syncRunningDetail"
+msgid "If you close now, the files already copied stay copied and the rest waits for the next sync."
+msgstr ""
+
+msgctxt "closeAnyway"
+msgid "Close"
+msgstr ""
+
+msgctxt "keepOpen"
+msgid "Keep open"
+msgstr ""
+
+msgctxt "cut"
+msgid "Cut"
+msgstr ""
+
+msgctxt "copy"
+msgid "Copy"
+msgstr ""
+
+msgctxt "paste"
+msgid "Paste"
+msgstr ""
+
+msgctxt "selectAll"
+msgid "Select all"
+msgstr ""
+
+msgctxt "oldVersions"
+msgid "Old versions"
+msgstr ""
+
+msgctxt "settings"
+msgid "Settings"
+msgstr ""
+
+msgctxt "back"
+msgid "Back"
+msgstr ""
+
+msgctxt "close"
+msgid "Close"
+msgstr ""
+
+msgctxt "cancel"
+msgid "Cancel"
+msgstr ""
+
+msgctxt "restartToUpdate"
+msgid "Restart to update"
+msgstr ""
+
+msgctxt "updateReady"
+msgid "Tandem {v} is downloaded."
+msgstr ""
+
+msgctxt "appClosed"
+msgid "Tandem was closed. Open it again."
+msgstr ""
+
+msgctxt "welcomeTitle"
+msgid "Choose the folder to keep in sync"
+msgstr ""
+
+msgctxt "welcomeText"
+msgid "Tandem keeps it the same on your other computers, over your own network or with a USB drive. Nothing goes to the internet."
+msgstr ""
+
+msgctxt "folderLabel"
+msgid "Folder on this computer"
+msgstr ""
+
+msgctxt "folderPlaceholder"
+msgid "Documents/Project"
+msgstr ""
+
+msgctxt "browse"
+msgid "Browse…"
+msgstr ""
+
+msgctxt "continue"
+msgid "Continue"
+msgstr ""
+
+msgctxt "secondComputerNote"
+msgid "Setting up a second computer? Choose where the folder should be on this one. An empty folder is fine: the files arrive at the first sync."
+msgstr ""
+
+msgctxt "addCopy"
+msgid "Add a copy"
+msgstr ""
+
+msgctxt "whereOther"
+msgid "Where is the other copy?"
+msgstr ""
+
+msgctxt "viaNetwork"
+msgid "Another computer on this network"
+msgstr ""
+
+msgctxt "viaNetworkSub"
+msgid "Both computers on at the same time, Tandem open on both"
+msgstr ""
+
+msgctxt "viaDrive"
+msgid "A USB drive or another folder"
+msgstr ""
+
+msgctxt "viaDriveSub"
+msgid "Carry it between computers that are never on together"
+msgstr ""
+
+msgctxt "showCode"
+msgid "Show a code here"
+msgstr ""
+
+msgctxt "enterCode"
+msgid "Enter the other computer's code"
+msgstr ""
+
+msgctxt "showCodeButton"
+msgid "Show a code"
+msgstr ""
+
+msgctxt "codeHelp"
+msgid "In Tandem on the other computer, choose Add a copy, Another computer, Enter the other computer's code, and type this code. It works for 10 minutes, once."
+msgstr ""
+
+msgctxt "codeAddress"
+msgid "If the other computer doesn't find this one, give it this address: {address}"
+msgstr ""
+
+msgctxt "codeLabel"
+msgid "Code shown on the other computer"
+msgstr ""
+
+msgctxt "computerLabel"
+msgid "Computer"
+msgstr ""
+
+msgctxt "noneShowingCode"
+msgid "No computer is showing a code on this network yet."
+msgstr ""
+
+msgctxt "typeAddress"
+msgid "Type its address…"
+msgstr ""
+
+msgctxt "addressLabel"
+msgid "Address shown on the other computer"
+msgstr ""
+
+msgctxt "pair"
+msgid "Pair"
+msgstr ""
+
+msgctxt "pairing"
+msgid "Pairing…"
+msgstr ""
+
+msgctxt "paired"
+msgid "Paired with {name}."
+msgstr ""
+
+msgctxt "drivesFound"
+msgid "Drives plugged in"
+msgstr ""
+
+msgctxt "noDrives"
+msgid "No drive found. Plug one in, or choose a folder."
+msgstr ""
+
+msgctxt "driveFree"
+msgid "{size} free"
+msgstr ""
+
+msgctxt "driveHolds"
+msgid "Holds a copy of “{name}”"
+msgstr ""
+
+msgctxt "useThisCopy"
+msgid "Use this copy"
+msgstr ""
+
+msgctxt "alreadyAdded"
+msgid "Already added"
+msgstr ""
+
+msgctxt "putCopyOn"
+msgid "Put a copy on it"
+msgstr ""
+
+msgctxt "chooseAnotherFolder"
+msgid "Choose another folder…"
+msgstr ""
+
+msgctxt "driveNote"
+msgid "Tandem makes its own folder on the drive and touches nothing else on it. On the second computer, plug the drive in and choose Use this copy."
+msgstr ""
+
+msgctxt "thisComputer"
+msgid "This computer"
+msgstr ""
+
+msgctxt "openFolder"
+msgid "Open folder"
+msgstr ""
+
+msgctxt "copies"
+msgid "Copies"
+msgstr ""
+
+#. A button: compare with this copy, then sync
+msgctxt "sync"
+msgid "Sync"
+msgstr ""
+
+msgctxt "onNetwork"
+msgid "On this network"
+msgstr ""
+
+msgctxt "notOnNetwork"
+msgid "Not found on the network"
+msgstr ""
+
+msgctxt "pluggedIn"
+msgid "Plugged in"
+msgstr ""
+
+msgctxt "notPluggedIn"
+msgid "Not plugged in"
+msgstr ""
+
+msgctxt "lastSynced"
+msgid "Last synced {when}"
+msgstr ""
+
+msgctxt "neverSynced"
+msgid "Never synced"
+msgstr ""
+
+msgctxt "guestSyncing"
+msgid "{name} is syncing with this computer…"
+msgstr ""
+
+msgctxt "todayAt"
+msgid "today at {time}"
+msgstr ""
+
+msgctxt "yesterdayAt"
+msgid "yesterday at {time}"
+msgstr ""
+
+msgctxt "comparingWith"
+msgid "Comparing with {name}…"
+msgstr ""
+
+msgctxt "readingHere"
+msgid "This computer: {done} of {total} files"
+msgstr ""
+
+msgctxt "readingThere"
+msgid "{name}: {done} of {total} files"
+msgstr ""
+
+msgctxt "readingThereBlind"
+msgid "{name}: reading its files…"
+msgstr ""
+
+msgctxt "changesWith"
+msgid "Changes with {name}"
+msgstr ""
+
+msgctxt "firstSyncNote"
+msgid "First sync with this copy: a file that exists on one side only is copied to the other. Nothing is deleted."
+msgstr ""
+
+msgctxt "conflictsTitle"
+msgid "{n} file changed on both sides"
+msgid_plural "{n} files changed on both sides"
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "conflictsHelp"
+msgid "Choose which version to keep. The other one is saved in the old versions."
+msgstr ""
+
+msgctxt "keepMineAll"
+msgid "Keep this computer's for all"
+msgstr ""
+
+msgctxt "keepTheirsAll"
+msgid "Keep {name}'s for all"
+msgstr ""
+
+msgctxt "keepBothAll"
+msgid "Keep both for all"
+msgstr ""
+
+#. A button: keep the version of this computer
+msgctxt "keepMine"
+msgid "This computer's"
+msgstr ""
+
+#. A button: keep the version of the other copy, {name} is that computer's or drive's name
+msgctxt "keepTheirs"
+msgid "{name}'s"
+msgstr ""
+
+#. A button: keep both versions of the file
+msgctxt "keepBoth"
+msgid "Both"
+msgstr ""
+
+msgctxt "keepFile"
+msgid "Keep the file"
+msgstr ""
+
+msgctxt "deleteIt"
+msgid "Delete it"
+msgstr ""
+
+#. A button: show the two versions of a file side by side
+msgctxt "compare"
+msgid "Compare"
+msgstr ""
+
+msgctxt "editedBoth"
+msgid "Here: {here}. {name}: {there}."
+msgstr ""
+
+msgctxt "editedHereDeletedThere"
+msgid "Edited here ({here}), deleted on {name}."
+msgstr ""
+
+msgctxt "deletedHereEditedThere"
+msgid "Deleted here, edited on {name} ({there})."
+msgstr ""
+
+msgctxt "toSend"
+msgid "{n} file to send to {name}"
+msgid_plural "{n} files to send to {name}"
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "toReceive"
+msgid "{n} file to receive from {name}"
+msgid_plural "{n} files to receive from {name}"
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "toRemoveHere"
+msgid "{n} file deleted on {name}: removed here too"
+msgid_plural "{n} files deleted on {name}: removed here too"
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "toRemoveThere"
+msgid "{n} file deleted here: removed on {name} too"
+msgid_plural "{n} files deleted here: removed on {name} too"
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "removedKept"
+msgid "Each one is kept in the old versions."
+msgstr ""
+
+msgctxt "clashTitle"
+msgid "{n} file left alone"
+msgid_plural "{n} files left alone"
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "clashHelp"
+msgid "Their names differ only by capital letters from another file or folder ({names}). Windows and macOS can't hold both: rename one."
+msgstr ""
+
+msgctxt "unreadTitle"
+msgid "{n} file could not be read"
+msgid_plural "{n} files could not be read"
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "unreadHelp"
+msgid "They are open in a program that locks them, or their folder can't be opened. They are left alone on both sides: close the program and compare again."
+msgstr ""
+
+#. A small label on a file that does not exist on the other side yet
+msgctxt "newFile"
+msgid "new"
+msgstr ""
+
+#. A small label on a file that exists on both sides with different content
+msgctxt "changedFile"
+msgid "changed"
+msgstr ""
+
+msgctxt "andMore"
+msgid "and {n} more"
+msgid_plural "and {n} more"
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "openConflictsNote"
+msgid "{n} conflict waits for your choice: it is skipped for now."
+msgid_plural "{n} conflicts wait for your choice: they are skipped for now."
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "safeNote"
+msgid "Nothing is overwritten or deleted without a copy kept in the old versions."
+msgstr ""
+
+msgctxt "syncFiles"
+msgid "Sync {n} file"
+msgid_plural "Sync {n} files"
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "nothingToSync"
+msgid "Nothing to sync yet"
+msgstr ""
+
+#. The title of the side-by-side view: only the file's path
+msgctxt "compareTitle"
+msgid "{path}"
+msgstr ""
+
+msgctxt "hereColumn"
+msgid "This computer"
+msgstr ""
+
+msgctxt "unchangedLines"
+msgid "{n} unchanged line"
+msgid_plural "{n} unchanged lines"
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "notPaired"
+msgid "The two versions have almost nothing in common: they are shown one after the other."
+msgstr ""
+
+msgctxt "cantShowText"
+msgid "This file can't be shown line by line."
+msgstr ""
+
+msgctxt "tooBigToShow"
+msgid "This file is too large to show line by line."
+msgstr ""
+
+msgctxt "openMine"
+msgid "Open this computer's version"
+msgstr ""
+
+msgctxt "openTheirs"
+msgid "Open {name}'s version"
+msgstr ""
+
+msgctxt "onlyHere"
+msgid "Only on this computer"
+msgstr ""
+
+msgctxt "onlyThere"
+msgid "Only on {name}"
+msgstr ""
+
+msgctxt "loading"
+msgid "Loading…"
+msgstr ""
+
+msgctxt "syncingWith"
+msgid "Syncing with {name}…"
+msgstr ""
+
+msgctxt "fileProgress"
+msgid "{done} of {total}"
+msgstr ""
+
+msgctxt "stop"
+msgid "Stop"
+msgstr ""
+
+msgctxt "stopping"
+msgid "Stopping after this file…"
+msgstr ""
+
+msgctxt "inSyncTitle"
+msgid "Both copies match"
+msgstr ""
+
+msgctxt "notInSyncTitle"
+msgid "Synced, with some things left"
+msgstr ""
+
+msgctxt "nothingChanged"
+msgid "Nothing had changed since the last sync."
+msgstr ""
+
+msgctxt "sentCount"
+msgid "{n} file sent"
+msgid_plural "{n} files sent"
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "receivedCount"
+msgid "{n} file received"
+msgid_plural "{n} files received"
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "removedCount"
+msgid "{n} file deleted"
+msgid_plural "{n} files deleted"
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "bothKeptCount"
+msgid "{n} file kept in both versions"
+msgid_plural "{n} files kept in both versions"
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "unansweredCount"
+msgid "{n} conflict waits for your choice"
+msgid_plural "{n} conflicts wait for your choice"
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "keptCount"
+msgid "{n} replaced file is kept in the old versions"
+msgid_plural "{n} replaced files are kept in the old versions"
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "problemChanged"
+msgid "changed during the sync: left alone"
+msgstr ""
+
+msgctxt "problemClash"
+msgid "name differs only by capital letters: left alone"
+msgstr ""
+
+msgctxt "problemUnread"
+msgid "could not be read: left alone"
+msgstr ""
+
+msgctxt "stoppedEarly"
+msgid "Stopped before the end. The files already copied stay copied."
+msgstr ""
+
+msgctxt "unsavedNote"
+msgid "The files are synced, but the record of it could not be saved on {name}. The next sync may ask about files that did not change."
+msgstr ""
+
+msgctxt "lostThere"
+msgid "{name} could not be reached any more. The files already copied stay copied."
+msgstr ""
+
+msgctxt "lostHere"
+msgid "The folder on this computer could not be reached any more."
+msgstr ""
+
+msgctxt "ejectNote"
+msgid "Eject the drive before you unplug it."
+msgstr ""
+
+msgctxt "closeBothNote"
+msgid "You can now close Tandem on both computers."
+msgstr ""
+
+msgctxt "done"
+msgid "Done"
+msgstr ""
+
+msgctxt "compareAgain"
+msgid "Compare again"
+msgstr ""
+
+msgctxt "tryAgain"
+msgid "Try again"
+msgstr ""
+
+msgctxt "couldNotSync"
+msgid "Could not sync with {name}"
+msgstr ""
+
+msgctxt "oldTitle"
+msgid "Old versions"
+msgstr ""
+
+msgctxt "oldHelp"
+msgid "Files replaced or deleted by a sync on this computer are kept here for {n} day."
+msgid_plural "Files replaced or deleted by a sync on this computer are kept here for {n} days."
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "oldEmpty"
+msgid "Nothing yet. When a sync replaces or deletes a file, the old one comes here."
+msgstr ""
+
+msgctxt "open"
+msgid "Open"
+msgstr ""
+
+#. A button: put an old version back in the folder
+msgctxt "putBack"
+msgid "Put back"
+msgstr ""
+
+msgctxt "putBackDone"
+msgid "{path} is back in the folder."
+msgstr ""
+
+msgctxt "settingsTitle"
+msgid "Settings"
+msgstr ""
+
+msgctxt "nameLabel"
+msgid "This computer's name"
+msgstr ""
+
+msgctxt "nameHelp"
+msgid "The name the other computers show for this one."
+msgstr ""
+
+msgctxt "addressHelp"
+msgid "Its address on this network: {address}"
+msgstr ""
+
+msgctxt "folderSection"
+msgid "Synced folder"
+msgstr ""
+
+msgctxt "changeFolder"
+msgid "Change…"
+msgstr ""
+
+msgctxt "changeFolderNote"
+msgid "With another folder, the next sync with each copy starts like a first sync."
+msgstr ""
+
+msgctxt "copiesSection"
+msgid "Copies"
+msgstr ""
+
+msgctxt "noCopies"
+msgid "No copy yet."
+msgstr ""
+
+msgctxt "rename"
+msgid "Rename"
+msgstr ""
+
+msgctxt "remove"
+msgid "Remove"
+msgstr ""
+
+msgctxt "removeConfirm"
+msgid "Remove {name}? Its files are not touched; it only stops being synced with this computer."
+msgstr ""
+
+msgctxt "ignoreSection"
+msgid "Files left out"
+msgstr ""
+
+msgctxt "ignoreHelp"
+msgid "One pattern per line. Files that programs rebuild or lock are not worth syncing and cause most conflicts."
+msgstr ""
+
+msgctxt "ignoreReset"
+msgid "Back to the usual list"
+msgstr ""
+
+msgctxt "keepSection"
+msgid "Old versions"
+msgstr ""
+
+msgctxt "keepLabel"
+msgid "Keep them for (days)"
+msgstr ""
+
+msgctxt "lookSection"
+msgid "Appearance"
+msgstr ""
+
+msgctxt "themeLabel"
+msgid "Theme"
+msgstr ""
+
+msgctxt "themeAuto"
+msgid "Like the system"
+msgstr ""
+
+msgctxt "themeLight"
+msgid "Light"
+msgstr ""
+
+msgctxt "themeDark"
+msgid "Dark"
+msgstr ""
+
+msgctxt "languageLabel"
+msgid "Language"
+msgstr ""
+
+msgctxt "languageAuto"
+msgid "Like the system"
+msgstr ""
+
+msgctxt "aboutSection"
+msgid "About"
+msgstr ""
+
+msgctxt "aboutText"
+msgid "Tandem {v}. Your files travel only between your own computers and drives, encrypted on the network. Nothing is sent to the internet."
+msgstr ""
+
+msgctxt "save"
+msgid "Save"
+msgstr ""
+
+msgctxt "saved"
+msgid "Saved"
+msgstr ""
