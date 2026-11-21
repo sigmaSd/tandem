@@ -18,7 +18,10 @@ file, and never overwrites or deletes anything without keeping a copy.
 3. **Sync**: Tandem compares the two copies and lists what it will do: files to send, to receive, deleted
    on the other side, and conflicts (changed on both sides) with three answers each: this computer's, the
    other's, or both. Text files can be compared side by side first.
-4. **Old versions**: every replaced or deleted file is kept for 90 days (`.tandem/old/` in the folder) and
+4. **Status**: between syncs, the home screen says what a sync would do with each copy ("2 to send · 1 to
+   receive"), or "can't tell" with why when it can't see a side (the other computer is off, the drive is
+   unplugged). It never says "in sync" without seeing both sides.
+5. **Old versions**: every replaced or deleted file is kept for 90 days (`.tandem/old/` in the folder) and
    can be put back from the window.
 
 Several copies are fine: two computers and a drive, three computers, and so on. Each is synced on its own.
@@ -60,5 +63,5 @@ shell/electron/   all the Electron code: window, menus, updates, packaging
 tools/            scripts: dev runner, install, translations
 tests/            vp test
 locales/app/      translations (.po), see docs/translating.md
-docs/             design.md (how the sync decides), network.md (pairing and encryption)
+docs/             design.md (how the sync decides, the status), network.md (pairing, encryption, protocol)
 ```

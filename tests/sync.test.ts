@@ -14,6 +14,7 @@ import {
   windowsTrouble,
 } from "../src/names.ts";
 import { plan } from "../src/plan.ts";
+import { Db } from "../src/db.ts";
 import { ChangedError, LocalStore, type Store, transfer } from "../src/store.ts";
 
 const STAMP = "20261120-160312";
@@ -200,6 +201,7 @@ test("sync: cut short, the next sync finishes the job and loses nothing", async 
     scan: (i, p) => b.scan(i, p),
     read: (p, o, l) => b.read(p, o, l),
     retire: (p, e, s) => b.retire(p, e, s),
+    checkpoint: () => b.checkpoint(),
     async begin(path, meta, expect) {
       const up = await b.begin(path, meta, expect);
       if (++writes < 2) return up;
@@ -226,6 +228,7 @@ test("sync: when the other copy goes away, the sync stops instead of failing eve
     scan: b.scan.bind(b),
     read: b.read.bind(b),
     retire: b.retire.bind(b),
+    checkpoint: () => Promise.resolve(),
     begin: () => Promise.reject(new Error("unplugged")),
   };
   const r = await apply({
@@ -339,22 +342,26 @@ test("store: an old version can be put back, and what it replaces is kept in tur
   expect(await b.listOld()).toEqual([]);
 });
 
-test("store: unchanged files are not hashed twice, changed ones are", async () => {
+test("store: unchanged files are not hashed twice, changed ones are, and the list outlives the app", async () => {
   const dir = scratch("cache");
-  const cache = join(scratch("cache-state"), "hashes.json");
+  const dbFile = join(scratch("cache-state"), "index.db");
   put(dir, { "big.pdf": "x".repeat(1000), "ch.tex": "v1" });
   const old = new Date(Date.now() - 60_000);
   const { utimesSync } = await import("node:fs");
   utimesSync(join(dir, "big.pdf"), old, old);
   utimesSync(join(dir, "ch.tex"), old, old);
-  const first = (await new LocalStore(dir, cache).scan("")).files;
-  // the cache is trusted: a wrong hash planted in it comes back for the untouched file
-  const planted = { ...first, "big.pdf": { ...first["big.pdf"], hash: "planted" } };
-  writeFileSync(cache, JSON.stringify(planted));
+  const db = new Db(dbFile);
+  const first = (await new LocalStore(dir, { scope: db.scope("folder") }).scan("")).files;
+  // the list is trusted: a wrong hash planted in it comes back for the untouched file
+  db.scope("folder").put("big.pdf", { ...first["big.pdf"], hash: "planted" });
+  db.close();
   writeFileSync(join(dir, "ch.tex"), "v2 longer");
-  const second = (await new LocalStore(dir, cache).scan("")).files;
-  expect(second["big.pdf"].hash).toBe("planted");
-  expect(second["ch.tex"].hash).not.toBe(first["ch.tex"].hash);
+  const again = new Db(dbFile); // as after a restart
+  const scan = await new LocalStore(dir, { scope: again.scope("folder") }).scan("");
+  expect(scan.files["big.pdf"].hash).toBe("planted");
+  expect(scan.files["ch.tex"].hash).not.toBe(first["ch.tex"].hash);
+  expect(scan.changed).toEqual(["ch.tex"]);
+  again.close();
 });
 
 test("store: a copy keeps the document's date", async () => {

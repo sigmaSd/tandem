@@ -11,7 +11,7 @@
 // Without a base (first sync, or a file neither side had before), a file on one side only is copied to the
 // other, never deleted: the first sync can only add.
 
-import { bare, type Listing } from "./store.ts";
+import { bare, type Listing } from "./listing.ts";
 
 /** a: this computer. b: the other copy. */
 export type Side = "a" | "b";
@@ -30,11 +30,17 @@ export type Action =
   /** Nothing to copy, but the base is out of date (both sides made the same change). */
   | { kind: "settle"; path: string; hash: string | null };
 
+/**
+ * `unread`: paths a side could not read (src/store.ts Scan). `skip`: paths left out of the sync by either
+ * side's list of files to leave out: neither copied nor deleted, whatever the lists say (two computers may
+ * leave out different things, and a file one of them doesn't list must not look deleted).
+ */
 export function plan(
   listA: Listing,
   listB: Listing,
   lastBase: Record<string, string>,
   unread: string[] = [],
+  skip: (path: string) => boolean = () => false,
 ): Action[] {
   // plain tables: a file may be named like something every object has ("constructor")
   const a = bare(listA);
@@ -47,7 +53,9 @@ export function plan(
       ...Object.keys(base),
       ...unread.filter((u) => !u.endsWith("/")),
     ]),
-  ].sort();
+  ]
+    .filter((p) => !skip(p))
+    .sort();
   /** A file a scan could not read, or anything in a folder it could not open: not known to be absent. */
   const unknown = (p: string) => unread.some((u) => p === u || (u.endsWith("/") && p.startsWith(u)));
 

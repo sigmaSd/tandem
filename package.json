@@ -1,8 +1,9 @@
 {
   "name": "tandem",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Keep one folder the same on several computers, over the local network or a USB drive, with nothing in the cloud",
+  "homepage": "https://tandem.invalid",
   "author": "Bedis Nbiba",
   "type": "module",
   "main": "dist/app/electron.mjs",

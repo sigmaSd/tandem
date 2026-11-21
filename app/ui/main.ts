@@ -8,7 +8,8 @@
 
 import "./desktop.ts";
 import type { Choice } from "../../src/apply.ts";
-import type { Core, Item, Job } from "../../src/core.ts";
+import type { Core, Item, ItemKind, Job } from "../../src/core.ts";
+import type { CopyStatus, Why } from "../../src/status.ts";
 import type { Row } from "../../src/diff.ts";
 import { stampTime } from "../../src/names.ts";
 import type { Translations } from "../../src/po.ts";
@@ -99,8 +100,22 @@ async function act(name: string, body: unknown = {}): Promise<boolean> {
 // ------------------------------------------------------------------ what the window remembers
 
 let state: State;
-let items: Item[] = [];
-let itemsRev = -1;
+/** The review's lines as loaded so far, by kind: all of them, or (for many) by top folder, page by page. */
+interface Lines {
+  total: number;
+  items: Item[];
+  limit: number;
+}
+interface Loaded extends Lines {
+  /** Set for a long list of files to copy or delete: its top folders, each opened on demand. */
+  groups?: { folder: string; count: number }[];
+  folders: Map<string, Lines>;
+}
+let sections: Partial<Record<ItemKind, Loaded>> = {};
+let reviewRev = -1;
+/** Up to this many lines a kind is shown whole; past it, by folder (conflicts: page by page). */
+const WHOLE = 300;
+const PAGE = 200;
 let view: "main" | "add" | "settings" | "old" | "compare" = "main";
 /** What is being typed, kept across redraws. */
 const form = {
@@ -121,7 +136,7 @@ const form = {
   newName: "",
   removing: "",
 };
-let compare: { path: string; data?: Diff; error?: string; unfolded: Set<number> } | null = null;
+let compare: { path: string; item: Item; data?: Diff; error?: string; unfolded: Set<number> } | null = null;
 let old: OldVersion[] | null = null;
 let stopping = false;
 let copiesBefore = 0;
@@ -428,20 +443,7 @@ function home(): Kid[] {
             "div",
             { class: "grow" },
             h("div", { class: "name" }, c.name),
-            h(
-              "div",
-              { class: `status${c.available ? " ok" : ""}` },
-              h("span", { class: "dot" }),
-              t(
-                c.kind === "drive"
-                  ? c.available
-                    ? "pluggedIn"
-                    : "notPluggedIn"
-                  : c.available
-                    ? "onNetwork"
-                    : "notOnNetwork",
-              ),
-            ),
+            ...statusLines(c.status, c.name),
             h(
               "div",
               { class: "sub" },
@@ -476,6 +478,65 @@ function home(): Kid[] {
   ];
 }
 
+const WHY: Record<Why, Key> = {
+  starting: "whyStarting",
+  off: "whyOff",
+  unplugged: "whyUnplugged",
+  network: "whyNetwork",
+  failed: "whyFailed",
+  missed: "whyMissed",
+  refused: "whyRefused",
+  nofolder: "whyNoFolder",
+  version: "whyVersion",
+};
+
+/**
+ * What the home screen says about a copy: what a sync would do when both sides are known, else each side on
+ * its own, and "can't tell" with why for a side it can't see. Never "in sync" without both sides.
+ */
+function statusLines(s: CopyStatus | null, name: string): Kid[] {
+  if (!s) return [h("div", { class: "status" }, t("statusChecking"))];
+  if (s.both) {
+    const b = s.both;
+    const parts: string[] = [];
+    if (b.send) parts.push(t("stSend", { n: b.send }));
+    if (b.receive) parts.push(t("stReceive", { n: b.receive }));
+    if (b.conflict) parts.push(t("stConflict", { n: b.conflict }));
+    if (b.other) parts.push(t("stOther", { n: b.other }));
+    if (!parts.length)
+      return [
+        h("div", { class: "status ok" }, h("span", { class: "dot" }), t(s.synced ? "stInSync" : "stSame")),
+      ];
+    return [
+      h(
+        "div",
+        { class: `status${b.conflict ? " warn" : " news"}` },
+        h("span", { class: "dot" }),
+        parts.join(" · "),
+      ),
+    ];
+  }
+  const half = (side: CopyStatus["here"], here: boolean) => {
+    if (!side.known)
+      return h(
+        "div",
+        { class: "status warn" },
+        icon("alert"),
+        " ",
+        t(here ? "stHereUnknown" : "stThereUnknown", { name, why: t(WHY[side.why]) }),
+      );
+    if (!s.synced) return null; // no record yet: nothing to compare one side with
+    return h(
+      "div",
+      { class: `status${side.changed ? " news" : ""}` },
+      side.changed
+        ? t(here ? "stChangedHere" : "stChangedThere", { n: side.changed, name })
+        : t(here ? "stNothingHere" : "stNothingThere", { name }),
+    );
+  };
+  return [half(s.here, true), half(s.there, false)];
+}
+
 function scanning(job: Extract<Job, { phase: "scanning" }>): Kid[] {
   const name = nameOf(job.copyId);
   const [hd, ht] = job.here;
@@ -497,34 +558,125 @@ function scanning(job: Extract<Job, { phase: "scanning" }>): Kid[] {
   ];
 }
 
-const MAX_ROWS = 200;
+/** Load the review's lines again (a new review, or an answer changed one): what was open stays open. */
+async function loadSections(job: Extract<Job, { phase: "review" }>) {
+  const next: Partial<Record<ItemKind, Loaded>> = {};
+  const page = (kind: ItemKind, limit: number, folder?: string) =>
+    call<Lines>(
+      `page?kind=${kind}&offset=0&limit=${limit}${folder === undefined ? "" : `&folder=${encodeURIComponent(folder)}`}`,
+    ).then((r) => ({ ...r, limit }));
+  for (const kind of Object.keys(job.counts) as ItemKind[]) {
+    const count = job.counts[kind];
+    if (!count) continue;
+    const before = sections[kind];
+    if (count <= WHOLE) next[kind] = { ...(await page(kind, count)), folders: new Map() };
+    else if (kind === "conflict")
+      next[kind] = { ...(await page(kind, Math.max(before?.limit ?? PAGE, PAGE))), folders: new Map() };
+    else {
+      const groups = await call<{ folder: string; count: number }[]>(`groups?kind=${kind}`);
+      const folders = new Map<string, Lines>();
+      for (const [folder, lines] of before?.folders ?? [])
+        if (groups.some((g) => g.folder === folder))
+          folders.set(folder, await page(kind, lines.limit, folder));
+      next[kind] = { total: count, items: [], limit: 0, groups, folders };
+    }
+  }
+  sections = next;
+}
+
+/** Load more lines of a kind, or of one of its folders (opened for the first time: its first page). */
+async function more(kind: ItemKind, folder?: string) {
+  const data = sections[kind];
+  if (!data) return;
+  const have = folder === undefined ? data : data.folders.get(folder);
+  const limit = (have?.limit ?? 0) + PAGE;
+  const r = await call<Lines>(
+    `page?kind=${kind}&offset=0&limit=${limit}${folder === undefined ? "" : `&folder=${encodeURIComponent(folder)}`}`,
+  ).catch(() => null);
+  if (!r) return;
+  if (folder === undefined) Object.assign(data, r, { limit });
+  else data.folders.set(folder, { ...r, limit });
+  draw(true);
+}
+
+/** Every loaded line (the compare view looks its file up here). */
+function loadedItems(): Item[] {
+  return Object.values(sections).flatMap((d) => [
+    ...d!.items,
+    ...[...d!.folders.values()].flatMap((f) => f.items),
+  ]);
+}
+
+function moreButton(lines: Lines, kind: ItemKind, folder?: string) {
+  if (lines.total <= lines.items.length) return null;
+  return h(
+    "div",
+    { class: "item" },
+    h("span", { class: "sub grow" }, t("andMore", { n: lines.total - lines.items.length })),
+    h("button", { class: "small", onclick: () => void more(kind, folder) }, t("showMore")),
+  );
+}
 
 function section(
-  key: string,
+  kind: ItemKind,
   title: string,
-  rows: Kid[],
-  total: number,
+  row: (it: Item) => Kid,
   opts: { cls?: string; help?: Kid; open?: boolean } = {},
 ) {
-  const open = sectionOpen.get(key) ?? opts.open ?? total <= 30;
+  const data = sections[kind];
+  if (!data) return null;
+  const open = sectionOpen.get(kind) ?? opts.open ?? data.total <= 30;
+  const body: Kid[] = [];
+  if (data.groups) {
+    // many files: by top folder, each loaded when opened
+    for (const g of data.groups) {
+      const key = `${kind}/${g.folder}`;
+      const lines = data.folders.get(g.folder);
+      body.push(
+        h(
+          "details",
+          {
+            class: "folder",
+            open: !!sectionOpen.get(key),
+            ontoggle: (e: Event) => {
+              const isOpen = (e.target as HTMLDetailsElement).open;
+              sectionOpen.set(key, isOpen);
+              if (isOpen && !lines) void more(kind, g.folder);
+            },
+          },
+          h(
+            "summary",
+            { class: "item" },
+            icon("folder"),
+            h("span", { class: "mono grow" }, g.folder ? ltr(`${g.folder}/`) : t("topLevel")),
+            h("span", { class: "chip" }, num(g.count)),
+          ),
+          ...(lines ? lines.items.map(row) : [h("div", { class: "item sub" }, t("loading"))]),
+          lines && moreButton(lines, kind, g.folder),
+        ),
+      );
+    }
+  } else {
+    body.push(...data.items.map(row), moreButton(data, kind));
+  }
   return h(
     "details",
     {
       class: `section ${opts.cls ?? ""}`,
       open,
-      ontoggle: (e: Event) => sectionOpen.set(key, (e.target as HTMLDetailsElement).open),
+      ontoggle: (e: Event) => sectionOpen.set(kind, (e.target as HTMLDetailsElement).open),
     },
     h("summary", null, title),
     opts.help && h("div", { class: "section-help sub" }, opts.help),
-    ...rows.slice(0, MAX_ROWS),
-    total > MAX_ROWS && h("div", { class: "item sub" }, t("andMore", { n: total - MAX_ROWS })),
+    ...body,
   );
 }
 
 const stamp = (m?: { size: number; mtime: number }) => (m ? `${when(m.mtime)}, ${bytes(m.size)}` : "");
 
-function openCompare(path: string) {
-  compare = { path, unfolded: new Set() };
+function openCompare(item: Item) {
+  const path = item.path;
+  compare = { path, item, unfolded: new Set() };
   view = "compare";
   draw();
   call<Diff>("diff", { path }).then(
@@ -567,8 +719,8 @@ function choiceButtons(it: Item, name: string, small = true): HTMLElement {
 
 function review(job: Extract<Job, { phase: "review" }>): Kid[] {
   const name = nameOf(job.copyId);
-  const of = (kind: Item["kind"]) => items.filter((i) => i.kind === kind);
-  const plain = (it: Item, ic: keyof typeof ICONS, cls: string, meta: string) =>
+  const n = job.counts;
+  const plain = (ic: keyof typeof ICONS, cls: string, meta: (it: Item) => string) => (it: Item) =>
     h(
       "div",
       { class: "item" },
@@ -577,145 +729,106 @@ function review(job: Extract<Job, { phase: "review" }>): Kid[] {
         "div",
         { class: "grow" },
         h("div", { class: "mono" }, ltr(it.path)),
-        h("div", { class: "sub" }, meta),
+        h("div", { class: "sub" }, meta(it)),
       ),
       it.fresh !== undefined && h("span", { class: "chip" }, t(it.fresh ? "newFile" : "changedFile")),
       it.fresh === false &&
         it.text &&
-        h("button", { class: "small", onclick: () => openCompare(it.path) }, t("compare")),
+        h("button", { class: "small", onclick: () => openCompare(it) }, t("compare")),
     );
-  const conflicts = of("conflict");
   const all = (choice: Choice | null, label: string) =>
     h("button", { class: "small", onclick: () => act("choose", { path: null, choice }) }, label);
-  const out: Kid[] = [
+  const conflict = (it: Item) =>
+    h(
+      "div",
+      { class: "item" },
+      icon("alert", "warn"),
+      h(
+        "div",
+        { class: "grow" },
+        h("div", { class: "mono" }, ltr(it.path)),
+        h(
+          "div",
+          { class: "sub" },
+          it.gone === "b"
+            ? t("editedHereDeletedThere", { here: stamp(it.here), name })
+            : it.gone === "a"
+              ? t("deletedHereEditedThere", { there: stamp(it.there), name })
+              : t("editedBoth", { here: stamp(it.here), there: stamp(it.there), name }),
+        ),
+        choiceButtons(it, name),
+      ),
+      h("button", { class: "small", onclick: () => openCompare(it) }, t("compare")),
+    );
+  return [
     h("h1", null, t("changesWith", { name })),
     job.first && h("p", { class: "note" }, t("firstSyncNote")),
-  ];
-  if (conflicts.length) {
-    out.push(
-      section(
-        "conflict",
-        t("conflictsTitle", { n: conflicts.length }),
-        conflicts.map((it) =>
-          h(
-            "div",
-            { class: "item" },
-            icon("alert", "warn"),
+    n.conflict > 0 &&
+      section("conflict", t("conflictsTitle", { n: n.conflict }), conflict, {
+        cls: "conflicts",
+        open: true,
+        help: h(
+          "div",
+          null,
+          h("p", null, t("conflictsHelp")),
+          n.conflict > 1 &&
             h(
               "div",
-              { class: "grow" },
-              h("div", { class: "mono" }, ltr(it.path)),
-              h(
-                "div",
-                { class: "sub" },
-                it.gone === "b"
-                  ? t("editedHereDeletedThere", { here: stamp(it.here), name })
-                  : it.gone === "a"
-                    ? t("deletedHereEditedThere", { there: stamp(it.there), name })
-                    : t("editedBoth", { here: stamp(it.here), there: stamp(it.there), name }),
-              ),
-              choiceButtons(it, name),
+              { class: "choices" },
+              all("a", t("keepMineAll")),
+              all("b", t("keepTheirsAll", { name })),
+              all("both", t("keepBothAll")),
             ),
-            h("button", { class: "small", onclick: () => openCompare(it.path) }, t("compare")),
-          ),
         ),
-        conflicts.length,
-        {
-          cls: "conflicts",
-          open: true,
-          help: h(
-            "div",
-            null,
-            h("p", null, t("conflictsHelp")),
-            conflicts.length > 1 &&
-              h(
-                "div",
-                { class: "choices" },
-                all("a", t("keepMineAll")),
-                all("b", t("keepTheirsAll", { name })),
-                all("both", t("keepBothAll")),
-              ),
-          ),
-        },
-      ),
-    );
-  }
-  const send = of("send");
-  const receive = of("receive");
-  const rmHere = of("remove-here");
-  const rmThere = of("remove-there");
-  const clash = of("clash");
-  const unread = of("unread");
-  if (send.length)
-    out.push(
+      }),
+    n.send > 0 &&
       section(
         "send",
-        t("toSend", { n: send.length, name }),
-        send.map((it) => plain(it, "right", "send", stamp(it.here))),
-        send.length,
+        t("toSend", { n: n.send, name }),
+        plain("right", "send", (it) => stamp(it.here)),
       ),
-    );
-  if (receive.length)
-    out.push(
+    n.receive > 0 &&
       section(
         "receive",
-        t("toReceive", { n: receive.length, name }),
-        receive.map((it) => plain(it, "left", "receive", stamp(it.there))),
-        receive.length,
+        t("toReceive", { n: n.receive, name }),
+        plain("left", "receive", (it) => stamp(it.there)),
       ),
-    );
-  if (rmHere.length)
-    out.push(
+    n["remove-here"] > 0 &&
       section(
-        "rm-here",
-        t("toRemoveHere", { n: rmHere.length, name }),
-        rmHere.map((it) => plain(it, "trash", "", stamp(it.here))),
-        rmHere.length,
+        "remove-here",
+        t("toRemoveHere", { n: n["remove-here"], name }),
+        plain("trash", "", (it) => stamp(it.here)),
         {
           help: t("removedKept"),
         },
       ),
-    );
-  if (rmThere.length)
-    out.push(
+    n["remove-there"] > 0 &&
       section(
-        "rm-there",
-        t("toRemoveThere", { n: rmThere.length, name }),
-        rmThere.map((it) => plain(it, "trash", "", stamp(it.there))),
-        rmThere.length,
-        {
-          help: t("removedKept"),
-        },
+        "remove-there",
+        t("toRemoveThere", { n: n["remove-there"], name }),
+        plain("trash", "", (it) => stamp(it.there)),
+        { help: t("removedKept") },
       ),
-    );
-  if (clash.length)
-    out.push(
+    n.clash > 0 &&
       section(
         "clash",
-        t("clashTitle", { n: clash.length }),
-        clash.map((it) => plain(it, "alert", "warn", (it.with ?? []).join(", "))),
-        clash.length,
+        t("clashTitle", { n: n.clash }),
+        plain("alert", "warn", (it) => (it.with ?? []).join(", ")),
         {
-          help: t("clashHelp", {
-            names: [...new Set(clash.flatMap((c) => c.with ?? []))].slice(0, 6).join(", "),
-          }),
+          help: t("clashHelpShort"),
         },
       ),
-    );
-  if (unread.length)
-    out.push(
+    n.unread > 0 &&
       section(
         "unread",
-        t("unreadTitle", { n: unread.length }),
-        unread.map((it) => plain(it, "alert", "warn", "")),
-        unread.length,
+        t("unreadTitle", { n: n.unread }),
+        plain("alert", "warn", () => ""),
         {
           help: t("unreadHelp"),
           open: true,
         },
       ),
-    );
-  return out;
+  ];
 }
 
 function reviewFooter(job: Extract<Job, { phase: "review" }>): Kid[] {
@@ -924,7 +1037,7 @@ function compareRows(rows: Row[], unfolded: Set<number>): Kid[] {
 
 function compareView(): Kid[] {
   const c = compare!;
-  const it = items.find((i) => i.path === c.path);
+  const it = loadedItems().find((i) => i.path === c.path) ?? c.item;
   const name = state.job ? nameOf(state.job.copyId) : "";
   const d = c.data;
   const opens = h(
@@ -974,7 +1087,7 @@ function compareView(): Kid[] {
 }
 
 function compareFooter(): Kid[] {
-  const it = items.find((i) => i.path === compare!.path);
+  const it = loadedItems().find((i) => i.path === compare!.path) ?? compare!.item;
   const name = state.job ? nameOf(state.job.copyId) : "";
   const close = () => {
     view = "main";
@@ -1356,7 +1469,8 @@ function draw(force = false) {
   const key = JSON.stringify([
     view,
     state,
-    itemsRev,
+    reviewRev,
+    sections,
     form,
     compare?.path,
     compare?.data ? 1 : 0,
@@ -1438,13 +1552,14 @@ async function refresh() {
   state = await call<State>("state");
   const job = state.job;
   if (job?.phase === "review") {
-    if (job.rev !== itemsRev) {
-      items = await call<Item[]>("items");
-      itemsRev = job.rev;
+    if (job.rev !== reviewRev) {
+      if (reviewRev === -1) sections = {}; // a new review: nothing of the last one stays
+      await loadSections(job);
+      reviewRev = job.rev;
     }
-  } else if (itemsRev !== -1) {
-    items = [];
-    itemsRev = -1;
+  } else if (reviewRev !== -1) {
+    sections = {};
+    reviewRev = -1;
     sectionOpen.clear();
   }
   draw();
@@ -1477,6 +1592,8 @@ async function start() {
       void pull();
     }
   };
+  // back to the window: the other computers' news now, not at the next 30-second question
+  window.addEventListener("focus", () => void call("focus", {}).catch(() => {}));
   const events = new EventSource("/api/events");
   events.onmessage = () => void pull();
   events.onerror = () => {

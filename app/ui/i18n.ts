@@ -64,13 +64,31 @@ export const UI_SOURCE = {
   openFolder: "Open folder",
   copies: "Copies",
   sync: "Sync",
-  onNetwork: "On this network",
-  notOnNetwork: "Not found on the network",
-  pluggedIn: "Plugged in",
-  notPluggedIn: "Not plugged in",
   lastSynced: "Last synced {when}",
   neverSynced: "Never synced",
   guestSyncing: "{name} is syncing with this computer…",
+  statusChecking: "Checking…",
+  stInSync: "In sync",
+  stSame: "Same files on both sides",
+  stSend: { one: "{n} to send", other: "{n} to send" },
+  stReceive: { one: "{n} to receive", other: "{n} to receive" },
+  stConflict: { one: "{n} conflict", other: "{n} conflicts" },
+  stOther: { one: "{n} left alone", other: "{n} left alone" },
+  stChangedHere: { one: "{n} file changed here", other: "{n} files changed here" },
+  stChangedThere: { one: "{n} file changed on {name}", other: "{n} files changed on {name}" },
+  stNothingHere: "Nothing changed here",
+  stNothingThere: "Nothing changed on {name}",
+  stHereUnknown: "This computer: can't tell ({why})",
+  stThereUnknown: "{name}: can't tell ({why})",
+  whyStarting: "still checking",
+  whyOff: "not on the network",
+  whyUnplugged: "not plugged in",
+  whyNetwork: "a network folder, changes made elsewhere aren't seen",
+  whyFailed: "this folder can't be watched",
+  whyMissed: "changes were missed, Sync checks again",
+  whyRefused: "it doesn't know this computer any more",
+  whyNoFolder: "no folder chosen there",
+  whyVersion: "it runs another version of Tandem",
   todayAt: "today at {time}",
   yesterdayAt: "yesterday at {time}",
 
@@ -110,14 +128,16 @@ export const UI_SOURCE = {
   },
   removedKept: "Each one is kept in the old versions.",
   clashTitle: { one: "{n} file left alone", other: "{n} files left alone" },
-  clashHelp:
-    "Their names differ only by capital letters from another file or folder ({names}). Windows and macOS can't hold both: rename one.",
   unreadTitle: { one: "{n} file could not be read", other: "{n} files could not be read" },
   unreadHelp:
     "They are open in a program that locks them, or their folder can't be opened. They are left alone on both sides: close the program and compare again.",
   newFile: "new",
   changedFile: "changed",
   andMore: { one: "and {n} more", other: "and {n} more" },
+  showMore: "Show more",
+  topLevel: "Files at the top",
+  clashHelpShort:
+    "Their names differ only by capital letters from another file or folder. Windows and macOS can't hold both: rename one.",
   openConflictsNote: {
     one: "{n} conflict waits for your choice: it is skipped for now.",
     other: "{n} conflicts wait for your choice: they are skipped for now.",
@@ -219,6 +239,12 @@ export const UI_SOURCE = {
 
 /** Notes for translators (the "#." lines of the catalogs). */
 export const UI_NOTES: Partial<Record<keyof typeof UI_SOURCE, string>> = {
+  stHereUnknown:
+    "A copy's status when this computer's side can't be known; {why} is one of the why… sentences",
+  stThereUnknown:
+    "A copy's status when the other side can't be known; {name} is that computer or drive, {why} one of the why… sentences",
+  stSend: "Status of a copy: how many files a sync would send there",
+  stOther: "Status of a copy: files a sync would leave alone (unreadable, or names clashing)",
   keepTheirs: "A button: keep the version of the other copy, {name} is that computer's or drive's name",
   keepMine: "A button: keep the version of this computer",
   keepBoth: "A button: keep both versions of the file",

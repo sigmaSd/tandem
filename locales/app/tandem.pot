@@ -324,22 +324,6 @@ msgctxt "sync"
 msgid "Sync"
 msgstr ""
 
-msgctxt "onNetwork"
-msgid "On this network"
-msgstr ""
-
-msgctxt "notOnNetwork"
-msgid "Not found on the network"
-msgstr ""
-
-msgctxt "pluggedIn"
-msgid "Plugged in"
-msgstr ""
-
-msgctxt "notPluggedIn"
-msgid "Not plugged in"
-msgstr ""
-
 msgctxt "lastSynced"
 msgid "Last synced {when}"
 msgstr ""
@@ -350,6 +334,110 @@ msgstr ""
 
 msgctxt "guestSyncing"
 msgid "{name} is syncing with this computer…"
+msgstr ""
+
+msgctxt "statusChecking"
+msgid "Checking…"
+msgstr ""
+
+msgctxt "stInSync"
+msgid "In sync"
+msgstr ""
+
+msgctxt "stSame"
+msgid "Same files on both sides"
+msgstr ""
+
+#. Status of a copy: how many files a sync would send there
+msgctxt "stSend"
+msgid "{n} to send"
+msgid_plural "{n} to send"
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "stReceive"
+msgid "{n} to receive"
+msgid_plural "{n} to receive"
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "stConflict"
+msgid "{n} conflict"
+msgid_plural "{n} conflicts"
+msgstr[0] ""
+msgstr[1] ""
+
+#. Status of a copy: files a sync would leave alone (unreadable, or names clashing)
+msgctxt "stOther"
+msgid "{n} left alone"
+msgid_plural "{n} left alone"
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "stChangedHere"
+msgid "{n} file changed here"
+msgid_plural "{n} files changed here"
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "stChangedThere"
+msgid "{n} file changed on {name}"
+msgid_plural "{n} files changed on {name}"
+msgstr[0] ""
+msgstr[1] ""
+
+msgctxt "stNothingHere"
+msgid "Nothing changed here"
+msgstr ""
+
+msgctxt "stNothingThere"
+msgid "Nothing changed on {name}"
+msgstr ""
+
+#. A copy's status when this computer's side can't be known; {why} is one of the why… sentences
+msgctxt "stHereUnknown"
+msgid "This computer: can't tell ({why})"
+msgstr ""
+
+#. A copy's status when the other side can't be known; {name} is that computer or drive, {why} one of the why… sentences
+msgctxt "stThereUnknown"
+msgid "{name}: can't tell ({why})"
+msgstr ""
+
+msgctxt "whyStarting"
+msgid "still checking"
+msgstr ""
+
+msgctxt "whyOff"
+msgid "not on the network"
+msgstr ""
+
+msgctxt "whyUnplugged"
+msgid "not plugged in"
+msgstr ""
+
+msgctxt "whyNetwork"
+msgid "a network folder, changes made elsewhere aren't seen"
+msgstr ""
+
+msgctxt "whyFailed"
+msgid "this folder can't be watched"
+msgstr ""
+
+msgctxt "whyMissed"
+msgid "changes were missed, Sync checks again"
+msgstr ""
+
+msgctxt "whyRefused"
+msgid "it doesn't know this computer any more"
+msgstr ""
+
+msgctxt "whyNoFolder"
+msgid "no folder chosen there"
+msgstr ""
+
+msgctxt "whyVersion"
+msgid "it runs another version of Tandem"
 msgstr ""
 
 msgctxt "todayAt"
@@ -480,10 +568,6 @@ msgid_plural "{n} files left alone"
 msgstr[0] ""
 msgstr[1] ""
 
-msgctxt "clashHelp"
-msgid "Their names differ only by capital letters from another file or folder ({names}). Windows and macOS can't hold both: rename one."
-msgstr ""
-
 msgctxt "unreadTitle"
 msgid "{n} file could not be read"
 msgid_plural "{n} files could not be read"
@@ -509,6 +593,18 @@ msgid "and {n} more"
 msgid_plural "and {n} more"
 msgstr[0] ""
 msgstr[1] ""
+
+msgctxt "showMore"
+msgid "Show more"
+msgstr ""
+
+msgctxt "topLevel"
+msgid "Files at the top"
+msgstr ""
+
+msgctxt "clashHelpShort"
+msgid "Their names differ only by capital letters from another file or folder. Windows and macOS can't hold both: rename one."
+msgstr ""
 
 msgctxt "openConflictsNote"
 msgid "{n} conflict waits for your choice: it is skipped for now."

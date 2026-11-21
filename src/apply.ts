@@ -5,7 +5,8 @@
 
 import { conflictName } from "./names.ts";
 import type { Action, Side } from "./plan.ts";
-import { ChangedError, type Entry, type Listing, type Store, transfer } from "./store.ts";
+import type { Entry, Listing } from "./listing.ts";
+import { ChangedError, type Store, transfer } from "./store.ts";
 
 /** A conflict's answer: keep this computer's file (a), the other copy's (b), or both. */
 export type Choice = "a" | "b" | "both";
@@ -52,7 +53,9 @@ export interface ApplyOptions {
   nameB: string;
   progress?: (p: Progress) => void;
   cancelled?: () => boolean;
-  /** Persist `base`: called every few files and at the end, whatever happened. */
+  /** Each change to `base`, as it is made (the caller keeps them, and persists them at `save`). */
+  record?: (path: string, hash: string | null) => void;
+  /** Persist what `record` was told: called every few files, after each deletion, and at the end. */
   save?: () => Promise<void>;
   /** Whether a store can still be reached, asked after a failure: when not, the sync stops there. */
   alive?: (side: Side) => Promise<boolean>;
@@ -86,12 +89,13 @@ export async function apply(o: ApplyOptions): Promise<ApplyResult> {
   const list = { a: listA, b: listB };
   const other = (s: Side): Side => (s === "a" ? "b" : "a");
 
+  const note = (path: string, hash: string | null) => {
+    if (hash === null) delete base[path];
+    else base[path] = hash;
+    o.record?.(path, hash);
+  };
   // what both sides already agree on needs no work: only the record
-  for (const act of o.actions) {
-    if (act.kind !== "settle") continue;
-    if (act.hash === null) delete base[act.path];
-    else base[act.path] = act.hash;
-  }
+  for (const act of o.actions) if (act.kind === "settle") note(act.path, act.hash);
 
   const work = o.actions.filter((x) => x.kind !== "settle");
   const totalBytes = work.reduce((n, x) => n + weight(x, o), 0);
@@ -120,13 +124,13 @@ export async function apply(o: ApplyOptions): Promise<ApplyResult> {
       },
     );
     list[to][dest] = landed;
-    base[dest] = source.hash;
+    note(dest, source.hash);
     return landed;
   };
   const remove = async (on: Side, path: string) => {
     await store[on].retire(path, list[on][path], stamp);
     delete list[on][path];
-    delete base[path];
+    note(path, null);
     // recorded at once: a deletion forgotten by a sync cut short could be repeated on a file put back since
     await o.save?.().catch(() => {});
   };
@@ -172,7 +176,6 @@ export async function apply(o: ApplyOptions): Promise<ApplyResult> {
     listA[name] = await transfer(b, a, path, theirs, null, stamp, name, (n) => (bytes += n));
     await copy("a", path); // theirs goes to their old versions, and comes back under the new name:
     await copy("a", name);
-    base[name] = theirs.hash;
     return { path, result: "both-kept", detail: name };
   };
 

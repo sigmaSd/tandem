@@ -49,11 +49,21 @@ Each side verifies the other's proof, so nobody in the middle can pair with eith
 2. **Messages.** Each question and answer is one AES-256-GCM message. The nonce is a counter that only
    grows, the session id and direction are authenticated with it. A repeated, reordered or redirected
    message is refused.
-3. **What can be asked** (`src/core.ts`, `#answer`): list the synced folder, read a piece of a file in it,
-   write a file into it (same rules as local writes: temporary name, hash check, old version kept), move a
-   file to the old versions, read and save the pair's base. Every path goes through `cleanRel`
-   (`src/names.ts`) and is refused if it passes through a link. Nothing else on the computer can be
-   reached. Old versions made by another computer's request are dated by this computer's own clock.
+3. **What can be asked** (`src/core.ts`, `#answer`, protocol 2):
+   - its status: folder name, the change numbers of its list and of its record of this pair, whether its
+     list follows its disk, its list of files left out. Answered from memory, nothing read from the disk;
+   - the changes of its list since a change number, in pages (with a scan of its disk first, for a sync);
+     the same for its record of this pair;
+   - read a piece of a file, write a file (small ones whole in one message; same rules as local writes:
+     temporary name, hash check, old version kept), move a file to the old versions, flush what was written,
+     and add this sync's changes to its record.
+
+   Every path goes through `cleanRel` (`src/names.ts`) and is refused if it passes through a link. Nothing
+   else on the computer can be reached. Old versions made by another computer's request are dated by this
+   computer's own clock. Writes carry the history id of the list they were planned on, and are refused when
+   its folder was changed since.
+
+Two computers must run the same protocol: a Tandem of protocol 1 is shown as "runs another version".
 
 A paired computer is trusted with the synced folder: it can read all of it and replace any file (the
 replaced one is kept as an old version). Pair only with your own computers. Removing a copy in the settings

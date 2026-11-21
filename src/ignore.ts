@@ -92,3 +92,25 @@ export function ignorer(patterns: string): (rel: string, isDir: boolean) => bool
     return false;
   };
 }
+
+/**
+ * One test for a whole path, folders on the way included ("build/out.pdf" is left out by "build/"), across
+ * several lists: what any of them leaves out is left out (two computers may each leave out their own things).
+ */
+export function skipper(...lists: string[]): (path: string) => boolean {
+  const tests = lists.map(ignorer);
+  const memo = new Map<string, boolean>();
+  const dir = (p: string): boolean => {
+    let v = memo.get(p);
+    if (v === undefined) {
+      const slash = p.lastIndexOf("/");
+      v = (slash > 0 && dir(p.slice(0, slash))) || tests.some((t) => t(p, true));
+      memo.set(p, v);
+    }
+    return v;
+  };
+  return (path) => {
+    const slash = path.lastIndexOf("/");
+    return (slash > 0 && dir(path.slice(0, slash))) || tests.some((t) => t(path, false));
+  };
+}

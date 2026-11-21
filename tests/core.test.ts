@@ -1,8 +1,10 @@
 import { put, scratch, tree } from "./_env.ts";
+import { createHash } from "node:crypto";
 import { existsSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vite-plus/test";
 import { Core, type Job } from "../src/core.ts";
+import { Db } from "../src/db.ts";
 import { Link, RemoteStore } from "../src/remote.ts";
 
 const running: Core[] = [];
@@ -11,8 +13,8 @@ afterEach(() => {
 });
 
 /** A Tandem of its own: its files in a scratch folder, listening only on this computer, silent on the network. */
-async function tandem(name: string, files: Record<string, string> = {}) {
-  const core = new Core(scratch(`${name}-state`), { discovery: false, bind: "127.0.0.1", port: 0 });
+async function tandem(name: string, files: Record<string, string> = {}, opts: { watch?: boolean } = {}) {
+  const core = new Core(scratch(`${name}-state`), { discovery: false, bind: "127.0.0.1", port: 0, ...opts });
   await core.init();
   core.config.device.name = name;
   const folder = scratch(`${name}-folder`);
@@ -242,6 +244,8 @@ test("core: old versions are filed under this computer's clock, whatever the oth
       onB.deviceId,
       Buffer.from(onB.key, "base64"),
     ),
+    new Db(":memory:").scope("peer"),
+    new Db(":memory:").scope("peerbase"),
   );
   const { files } = await remote.scan("");
   const up = await remote.begin(
@@ -379,4 +383,149 @@ test("core: what the window is told holds no key", async () => {
   expect(key.length).toBeGreaterThan(20);
   expect(JSON.stringify(a.core.state())).not.toContain(key);
   expect(JSON.stringify(a.core.state())).not.toContain(a.core.config.device.id);
+});
+
+/** A copy's status once the first scans are done and the other computers were asked. */
+async function statusOf(core: Core, id: string) {
+  await core.settled();
+  return core.state().copies.find((c) => c.id === id)!.status!;
+}
+
+/** Wait until `check` holds (a watcher waits for the folder to be quiet before it tells). */
+async function waitFor(check: () => Promise<boolean>, what: string) {
+  const deadline = Date.now() + 10_000;
+  while (!(await check())) {
+    if (Date.now() > deadline) throw new Error(`still not: ${what}`);
+    await new Promise((r) => setTimeout(r, 150));
+  }
+}
+
+test("core status: a drive in sync, then a change here seen by the watcher, then unplugged", async () => {
+  const a = await tandem("Office PC", { "ch1.tex": "1" });
+  const drive = scratch("status-drive");
+  await a.core.addDrive(drive);
+  const id = a.core.config.copies[0].id;
+  await syncNow(a.core, id);
+  const synced = await statusOf(a.core, id);
+  expect(synced).toMatchObject({ synced: true, both: { send: 0, receive: 0, conflict: 0, other: 0 } });
+  put(a.folder, { "ch2.tex": "2" });
+  await waitFor(async () => (await statusOf(a.core, id)).both?.send === 1, "one file to send");
+  rmSync(`${drive}-away`, { recursive: true, force: true }); // left by an earlier run
+  renameSync(drive, `${drive}-away`);
+  const away = await statusOf(a.core, id);
+  expect(away.both).toBeUndefined();
+  expect(away.there).toEqual({ known: false, why: "unplugged" });
+  expect(away.here).toEqual({ known: true, changed: 1 }); // what changed here is still known
+}, 20_000);
+
+test("core status: another computer is asked for its news, and is 'can't tell' once it's off", async () => {
+  const a = await tandem("Office PC", { "ch1.tex": "1" });
+  const b = await tandem("Laptop");
+  const ids = await pair(a.core, b.core);
+  await syncNow(b.core, ids.onB);
+  expect((await statusOf(a.core, ids.onA)).both).toEqual({ send: 0, receive: 0, conflict: 0, other: 0 });
+  put(b.folder, { "ch2.tex": "written on the laptop" });
+  await waitFor(async () => (await statusOf(a.core, ids.onA)).both?.receive === 1, "one file to receive");
+  expect((await statusOf(a.core, ids.onA)).there).toEqual({ known: true, changed: 1 });
+  expect(b.core.state().guest).toBeNull(); // being asked for news is not a sync
+  b.core.stop();
+  const off = await statusOf(a.core, ids.onA);
+  expect(off.there).toEqual({ known: false, why: "off" });
+  expect(off.here).toEqual({ known: true, changed: 0 });
+  expect(off.both).toBeUndefined();
+}, 25_000);
+
+test("core status: a folder that can't be watched is 'can't tell', and a sync still works", async () => {
+  const a = await tandem("Office PC", { "ch1.tex": "1" }, { watch: false });
+  const drive = scratch("unwatched-drive");
+  await a.core.addDrive(drive);
+  const id = a.core.config.copies[0].id;
+  const s = await statusOf(a.core, id);
+  expect(s.here).toEqual({ known: false, why: "failed" });
+  expect(s.there).toEqual({ known: false, why: "failed" });
+  expect(await syncNow(a.core, id)).toMatchObject({ sent: 1, inSync: true });
+});
+
+test("core: the review comes in pages and in folders", async () => {
+  const files: Record<string, string> = { "a.tex": "a", "b.tex": "b" };
+  for (let i = 0; i < 12; i++) files[`fig/f${i}.pdf`] = String(i);
+  for (let i = 0; i < 5; i++) files[`ch/c${i}.tex`] = String(i);
+  const a = await tandem("Office PC", files);
+  await a.core.addDrive(scratch("paged-drive"));
+  a.core.compare(a.core.config.copies[0].id);
+  await reach(a.core, "review");
+  const first = a.core.page("send", 0, 5);
+  expect(first.total).toBe(19);
+  expect(first.items.map((i) => i.path)).toEqual(["a.tex", "b.tex", "ch/c0.tex", "ch/c1.tex", "ch/c2.tex"]);
+  expect(a.core.page("send", 15, 5).items.length).toBe(4);
+  expect(a.core.groups("send")).toEqual([
+    { folder: "fig", count: 12 },
+    { folder: "ch", count: 5 },
+    { folder: "", count: 2 },
+  ]);
+  expect(a.core.page("send", 0, 100, "ch").total).toBe(5);
+  expect(a.core.page("receive").total).toBe(0);
+});
+
+test("core: another computer's list arrives in pages, then only its changes", async () => {
+  const files: Record<string, string> = {};
+  for (let i = 0; i < 7; i++) files[`f${i}.tex`] = String(i);
+  const a = await tandem("Office PC", files);
+  const b = await tandem("Laptop");
+  await pair(a.core, b.core);
+  await a.core.settled();
+  const onB = b.core.config.copies[0];
+  if (onB.kind !== "device") throw new Error("not a device");
+  const mirror = new Db(":memory:").scope("peer");
+  const remote = new RemoteStore(
+    new Link(
+      `127.0.0.1:${a.core.port}`,
+      { id: b.core.config.device.id, port: b.core.port },
+      onB.deviceId,
+      Buffer.from(onB.key, "base64"),
+    ),
+    mirror,
+    new Db(":memory:").scope("peerbase"),
+  );
+  remote.pageSize = 2;
+  await remote.pull(false);
+  expect(Object.keys(mirror.view()).length).toBe(7);
+  const seq = mirror.seq;
+  rmSync(join(a.folder, "f3.tex"));
+  put(a.folder, { "f9.tex": "9" });
+  await waitFor(async () => {
+    const st = await remote.status();
+    return st.seq >= seq + 2;
+  }, "the change number to move");
+  await remote.pull(false);
+  expect(Object.keys(mirror.view()).sort()).toEqual([
+    "f0.tex",
+    "f1.tex",
+    "f2.tex",
+    "f4.tex",
+    "f5.tex",
+    "f6.tex",
+    "f9.tex",
+  ]);
+}, 20_000);
+
+test("core: the records of Tandem 0.1.0 move into the database, so the next sync is not a first sync", async () => {
+  const a = await tandem("Office PC", { "kept.tex": "k" });
+  const drive = scratch("upgrade-drive");
+  put(drive, { "kept.tex": "k", "deleted-here.tex": "d" });
+  await a.core.addDrive(drive);
+  const id = a.core.config.copies[0].id;
+  const hash = (t: string) => createHash("sha256").update(t).digest("hex");
+  a.core.stop();
+  // as 0.1.0 left it: both files were synced, then deleted-here.tex was deleted on this computer
+  put(a.core.stateDir, {
+    [`base/${id}.json`]: JSON.stringify({ "kept.tex": hash("k"), "deleted-here.tex": hash("d") }),
+  });
+  const again = new Core(a.core.stateDir, { discovery: false, bind: "127.0.0.1", port: 0 });
+  await again.init();
+  running.push(again);
+  expect(existsSync(join(a.core.stateDir, "base"))).toBe(false);
+  const summary = await syncNow(again, id);
+  expect(summary).toMatchObject({ removed: 1, inSync: true }); // a deletion, not a file brought back
+  expect(tree(drive)).toEqual({ "kept.tex": "k" });
 });

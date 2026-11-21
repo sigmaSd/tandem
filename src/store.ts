@@ -1,6 +1,9 @@
 // One copy of the synced folder, as the sync sees it (src/plan.ts decides, src/apply.ts acts): list the
 // files with their content hashes, read one, write one, take one away. LocalStore is a folder on this
 // computer or on a plugged drive; src/remote.ts is the same thing on another computer, over the network.
+// A LocalStore keeps its list in a scope of the database (src/db.ts): a scan reads the disk and updates it,
+// refresh() updates only the paths the watcher named (src/watch.ts), and every file a sync writes or takes
+// away is recorded as it happens.
 //
 // The rules every store keeps:
 // - a file is never overwritten or deleted: the old one moves to .tandem/old/<time>/<same path> first;
@@ -12,31 +15,14 @@
 import { execFile } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { createReadStream } from "node:fs";
-import {
-  lstat,
-  mkdir,
-  open,
-  readdir,
-  readFile,
-  rename,
-  rm,
-  rmdir,
-  stat,
-  utimes,
-  writeFile,
-} from "node:fs/promises";
+import { lstat, mkdir, open, readdir, readFile, rename, rm, rmdir, stat, utimes } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { Db, type Scope } from "./db.ts";
 import { ignorer } from "./ignore.ts";
+import { bare, type Entry, type Listing } from "./listing.ts";
 import { cleanRel, NameError, OWN, windowsTrouble } from "./names.ts";
 
-/** A file as a scan saw it. `mtime` in whole milliseconds; `hash` is the SHA-256 of the content, in hex. */
-export interface Entry {
-  size: number;
-  mtime: number;
-  hash: string;
-}
-/** Every synced file of one copy, by its path inside the folder. */
-export type Listing = Record<string, Entry>;
+export { bare, type Entry, type Listing };
 
 /**
  * What a scan found. `unread`: files that are there but could not be read (open in a program that locks
@@ -48,19 +34,16 @@ export interface Scan {
   unread: string[];
 }
 
+/** A scan of this computer's disk: also which files it found different from what the list remembered. */
+export interface LocalScan extends Scan {
+  changed: string[];
+}
+
 /** The file is no longer what the scan saw (edited, replaced or removed meanwhile): nothing was done. */
 export class ChangedError extends Error {}
 
 /** The copy itself is not there any more (a drive unplugged, a folder removed): nothing was done. */
 export class GoneError extends Error {}
-
-/**
- * A plain table without Object's own baggage: a file may be named "constructor" or "__proto__", and must be
- * neither found when absent nor mistaken for the table's prototype when written.
- */
-export function bare<T>(from?: Record<string, T> | null): Record<string, T> {
-  return Object.assign(Object.create(null) as Record<string, T>, from ?? {});
-}
 
 /** A file on its way in. Nothing shows in the folder until commit(). */
 export interface Upload {
@@ -85,9 +68,11 @@ export interface Store {
   begin(path: string, meta: FileMeta, expect: Entry | null): Promise<Upload>;
   /** Take a file away (to the old versions). */
   retire(path: string, expect: Entry, stamp: string): Promise<void>;
-  /** The other computer's record of what both sides held after the last sync, when the copy keeps one. */
-  loadBase?(): Promise<Record<string, string> | null>;
-  saveBase?(files: Record<string, string>): Promise<void>;
+  /**
+   * Make sure what was written so far is on the disk, names included (a drive pulled right after keeps it).
+   * Called before the record of the sync says those files landed.
+   */
+  checkpoint(): Promise<void>;
 }
 
 export interface OldVersion {
@@ -122,26 +107,36 @@ async function syncDir(dir: string) {
   }
 }
 
+export interface LocalOptions {
+  /** Where the list of files is kept (between runs, when it is in the app's database). */
+  scope?: Scope;
+  /**
+   * The id this copy's .tandem/copy.json must carry (a drive, src/drives.ts): with another drive mounted at
+   * the same place, or none, the store refuses to work rather than write somewhere else.
+   */
+  marker?: string;
+}
+
 export class LocalStore implements Store {
   readonly root: string;
-  readonly #cacheFile?: string;
+  /** The list of files: unchanged files are not hashed again, and other computers ask it for changes. */
+  readonly scope: Scope;
   readonly #marker?: string;
-  /** What the last scan (or write) found: unchanged files are not hashed again. */
-  #known: Listing = bare();
-  #loaded = false;
+  /** Files that are there but could not be read, and folders that could not be opened (ending in "/"). */
+  readonly unread = new Set<string>();
   /** Files whose name on disk is not NFC (made on an older Mac): path as we name it → as the disk does. */
   readonly #onDisk = new Map<string, string>();
+  /** Folders whose list of names changed since the last checkpoint. */
+  readonly #touched = new Set<string>();
+  #ignore = "";
   #ownMade = false;
+  /** Scans and refreshes run one at a time. */
+  #lock: Promise<unknown> = Promise.resolve();
 
-  /**
-   * `cacheFile`: where the hashes are remembered between runs (outside the folder), when given.
-   * `marker`: the id this copy's .tandem/copy.json must carry (a drive, src/drives.ts): with another drive
-   * mounted at the same place, or none, the store refuses to work rather than write somewhere else.
-   */
-  constructor(root: string, cacheFile?: string, marker?: string) {
+  constructor(root: string, opts: LocalOptions = {}) {
     this.root = root;
-    this.#cacheFile = cacheFile;
-    this.#marker = marker;
+    this.scope = opts.scope ?? new Db(":memory:").scope("folder");
+    this.#marker = opts.marker;
   }
 
   /** Whether the copy is there: its folder exists, and it is the expected one. */
@@ -179,34 +174,28 @@ export class LocalStore implements Store {
     return join(own, ...parts);
   }
 
-  async #loadKnown() {
-    if (this.#loaded || !this.#cacheFile) return;
-    this.#loaded = true;
-    try {
-      this.#known = bare(JSON.parse(await readFile(this.#cacheFile, "utf8")) as Listing);
-    } catch {
-      /* no cache yet, or unreadable: every file is hashed */
-    }
+  /** One at a time: a scan and a refresh of the same folder never interleave. */
+  #exclusive<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.#lock.then(fn, fn);
+    this.#lock = run.catch(() => {});
+    return run;
   }
 
-  async #saveKnown() {
-    if (!this.#cacheFile) return;
-    try {
-      await mkdir(dirname(this.#cacheFile), { recursive: true });
-      await writeFile(this.#cacheFile, JSON.stringify(this.#known));
-    } catch {
-      /* only a cache */
-    }
+  /** Read the whole folder from the disk and bring the list up to date with it. */
+  scan(ignore: string, progress?: (done: number, total: number) => void): Promise<LocalScan> {
+    return this.#exclusive(() => this.#scan(ignore, progress));
   }
 
-  async scan(ignore: string, progress?: (done: number, total: number) => void): Promise<Scan> {
+  async #scan(ignore: string, progress?: (done: number, total: number) => void): Promise<LocalScan> {
     await this.#mustBeThere();
-    await this.#loadKnown();
+    // what the list held as the scan began: an entry a sync wrote meanwhile is newer than what the scan saw
+    const before = new Map(Object.entries(this.scope.view()));
+    this.#ignore = ignore;
     const skip = ignorer(ignore);
     const found: string[] = [];
     const unread: string[] = [];
     this.#onDisk.clear();
-    const walk = async (dir: string, rel: string) => {
+    const walk = async (dir: string, rel: string, onDisk: string) => {
       let items;
       try {
         items = await readdir(dir, { withFileTypes: true });
@@ -218,47 +207,147 @@ export class LocalStore implements Store {
       for (const it of items) {
         const name = it.name.normalize("NFC");
         const path = rel ? `${rel}/${name}` : name;
+        const diskPath = onDisk ? `${onDisk}/${it.name}` : it.name;
         if (name.includes("\\")) continue; // can't exist on Windows, and "\" is not a separator for us
-        if (it.name !== name)
-          this.#onDisk.set(path, rel ? `${this.#onDisk.get(rel) ?? rel}/${it.name}` : it.name);
+        if (diskPath !== path) this.#onDisk.set(path, diskPath);
         if (it.isDirectory()) {
-          if (!skip(path, true)) await walk(join(dir, it.name), path);
+          if (!skip(path, true)) await walk(join(dir, it.name), path, diskPath);
         } else if (it.isFile() && !skip(path, false)) found.push(path); // links and devices are left alone
       }
     };
-    await walk(this.root, "");
+    await walk(this.root, "", "");
 
-    const listing: Listing = bare();
+    const seen = new Set<string>();
+    const fresh: [string, Entry][] = [];
     const now = Date.now();
     let done = 0;
     for (const rel of found.sort()) {
       progress?.(done++, found.length);
-      let st;
-      try {
-        st = await lstat(this.#abs(rel));
-      } catch (e) {
-        if (!isMissing(e)) unread.push(rel); // listed but not readable: there, unknown
-        continue; // else gone since the walk
-      }
-      const size = st.size;
-      const mtime = Math.round(st.mtimeMs);
-      const known = this.#known[rel];
-      // a file changed in the last seconds is hashed again: a second edit could keep both size and time
-      if (known && known.size === size && known.mtime === mtime && now - mtime > 3000) {
-        listing[rel] = known;
-        continue;
-      }
-      try {
-        listing[rel] = { size, mtime, hash: await hashFile(this.#abs(rel)) };
-      } catch (e) {
-        // deleted meanwhile: gone. Anything else (locked by another program, no permission): there, unknown
-        if (!isMissing(e)) unread.push(rel);
+      const got = await this.#look(rel, now);
+      if (got === "unread") unread.push(rel);
+      else if (got) {
+        seen.add(rel);
+        fresh.push([rel, got]);
       }
     }
     progress?.(found.length, found.length);
-    this.#known = bare(listing);
-    await this.#saveKnown();
-    return { files: listing, unread };
+    const unknown = (p: string) => unread.some((u) => p === u || (u.endsWith("/") && p.startsWith(u)));
+    const changed: string[] = [];
+    const untouched = (rel: string) => this.scope.get(rel) === before.get(rel);
+    this.scope.transaction(() => {
+      for (const [rel, e] of fresh) if (untouched(rel) && this.scope.put(rel, e)) changed.push(rel);
+      for (const rel of Object.keys(this.scope.view()))
+        if (!seen.has(rel) && !unknown(rel) && untouched(rel) && this.scope.remove(rel)) changed.push(rel);
+    });
+    this.unread.clear();
+    for (const u of unread) this.unread.add(u);
+    return { files: this.scope.snapshot(), unread, changed };
+  }
+
+  /**
+   * A file as it is on the disk: its entry (hashed again only when its size or date moved, or it changed in
+   * the last seconds), "unread" when it is there but can't be read, or null when it is gone.
+   */
+  async #look(rel: string, now: number): Promise<Entry | "unread" | null> {
+    let st;
+    try {
+      st = await lstat(this.#abs(rel));
+    } catch (e) {
+      return isMissing(e) ? null : "unread";
+    }
+    if (!st.isFile()) return null;
+    const size = st.size;
+    const mtime = Math.round(st.mtimeMs);
+    const known = this.scope.get(rel);
+    // a file changed in the last seconds is hashed again: a second edit could keep both size and time
+    if (known && known.size === size && known.mtime === mtime && now - mtime > 3000) return known;
+    try {
+      return { size, mtime, hash: await hashFile(this.#abs(rel)) };
+    } catch (e) {
+      // deleted meanwhile: gone. Anything else (locked by another program, no permission): there, unknown
+      return isMissing(e) ? null : "unread";
+    }
+  }
+
+  /**
+   * Bring the list up to date for these paths only (what the watcher saw change; on-disk names). A folder is
+   * read again whole. Returns the paths whose entry changed.
+   */
+  refresh(paths: Iterable<string>): Promise<string[]> {
+    const list = [...paths];
+    return this.#exclusive(() => this.#refresh(list));
+  }
+
+  async #refresh(paths: string[]): Promise<string[]> {
+    if (!(await this.present())) return [];
+    const before = new Map(Object.entries(this.scope.view()));
+    const skip = ignorer(this.#ignore);
+    const now = Date.now();
+    const results: [string, Entry | null][] = [];
+    const unreadNow: string[] = [];
+    const visit = async (rel: string, diskRel: string) => {
+      if (!rel || rel === OWN || rel.startsWith(`${OWN}/`)) return;
+      const parts = rel.split("/");
+      // a path below a folder that is left out (or below Tandem's own) is left out too
+      for (let i = 1; i < parts.length; i++) if (skip(parts.slice(0, i).join("/"), true)) return;
+      let st;
+      try {
+        st = await lstat(join(this.root, ...diskRel.split("/")));
+      } catch (e) {
+        if (!isMissing(e)) return void unreadNow.push(rel);
+        for (const p of this.scope.under(rel)) results.push([p, null]); // a file or a whole folder went away
+        return;
+      }
+      if (diskRel !== rel) this.#onDisk.set(rel, diskRel);
+      if (st.isDirectory()) {
+        if (skip(rel, true)) return;
+        let items;
+        try {
+          items = await readdir(join(this.root, ...diskRel.split("/")), { withFileTypes: true });
+        } catch {
+          return void unreadNow.push(`${rel}/`);
+        }
+        const inside = new Set<string>();
+        for (const it of items) {
+          const name = it.name.normalize("NFC");
+          if (name.includes("\\")) continue;
+          inside.add(`${rel}/${name}`);
+          await visit(`${rel}/${name}`, `${diskRel}/${it.name}`);
+        }
+        // what the list has directly in this folder and the disk no longer does
+        for (const p of this.scope.under(rel)) {
+          const child = p.slice(rel.length + 1).split("/")[0];
+          if (!inside.has(`${rel}/${child}`)) results.push([p, null]);
+        }
+        return;
+      }
+      if (!st.isFile() || skip(rel, false)) {
+        for (const p of this.scope.under(rel)) results.push([p, null]); // now a link, or left out
+        return;
+      }
+      const got = await this.#look(rel, now);
+      if (got === "unread") unreadNow.push(rel);
+      else results.push([rel, got]);
+    };
+    for (const p of paths) {
+      // the watcher's names use the system's separator; "\\" is a letter of the name elsewhere
+      const disk = p
+        .split(process.platform === "win32" ? /[\\/]+/ : /\/+/)
+        .filter(Boolean)
+        .join("/");
+      const rel = disk.normalize("NFC");
+      if (rel && !rel.split("/").some((x) => x === "." || x === "..")) await visit(rel, disk);
+    }
+    const changed: string[] = [];
+    this.scope.transaction(() => {
+      for (const [rel, e] of results) {
+        this.unread.delete(rel);
+        if (this.scope.get(rel) !== before.get(rel)) continue; // a sync wrote it meanwhile: newer
+        if (e ? this.scope.put(rel, e) : this.scope.remove(rel)) changed.push(rel);
+      }
+    });
+    for (const u of unreadNow) this.unread.add(u);
+    return changed;
   }
 
   async read(path: string, offset: number, length: number): Promise<Uint8Array> {
@@ -331,6 +420,8 @@ export class LocalStore implements Store {
     }
     await mkdir(dirname(target), { recursive: true });
     await rename(this.#abs(rel), target);
+    this.#touched.add(dirname(target));
+    this.#touched.add(dirname(this.#abs(rel)));
   }
 
   async begin(path: string, meta: FileMeta, expect: Entry | null): Promise<Upload> {
@@ -370,10 +461,11 @@ export class LocalStore implements Store {
           const dest = this.#abs(rel);
           await mkdir(dirname(dest), { recursive: true });
           await rename(tmp, dest);
-          await syncDir(dirname(dest)); // the new name itself on the disk, for a drive pulled right after
+          this.#touched.add(dirname(dest)); // its new name reaches the disk at the next checkpoint
           const st = await lstat(dest);
           const entry = { size: st.size, mtime: Math.round(st.mtimeMs), hash: meta.hash };
-          this.#known[rel] = entry;
+          this.scope.put(rel, entry);
+          this.unread.delete(rel);
           return entry;
         } catch (e) {
           await drop();
@@ -390,7 +482,7 @@ export class LocalStore implements Store {
     await this.#noLinks(rel);
     await this.#check(rel, expect);
     await this.#toOld(rel, stamp);
-    delete this.#known[rel];
+    this.scope.remove(rel);
     this.#onDisk.delete(rel);
     // folders left empty go too (never the synced folder itself)
     let dir = dirname(this.#abs(rel));
@@ -404,9 +496,10 @@ export class LocalStore implements Store {
     }
   }
 
-  /** Remember the hashes now (after a sync wrote files). */
-  async flush() {
-    await this.#saveKnown();
+  async checkpoint() {
+    const dirs = [...this.#touched];
+    this.#touched.clear();
+    for (const dir of dirs) await syncDir(dir);
   }
 
   /** What a file is right now (for an old version put back), or null. */
@@ -465,7 +558,7 @@ export class LocalStore implements Store {
       await up.abort();
       throw e;
     }
-    await this.#saveKnown();
+    await this.checkpoint();
   }
 
   /** Forget old versions kept for longer than `days`; returns how many folders went. */

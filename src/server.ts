@@ -8,7 +8,7 @@ import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import type { Choice } from "./apply.ts";
-import { type Core, UserError } from "./core.ts";
+import { type Core, type ItemKind, UserError } from "./core.ts";
 import { CSP, guard, newSecret } from "./guard.ts";
 import { NameError } from "./names.ts";
 
@@ -68,6 +68,8 @@ function actions(core: Core): Record<string, (b: Record<string, unknown>) => unk
         CHOICES.includes(str(b.choice)) ? (b.choice as Choice) : null,
       ),
     start: () => core.start(),
+    // the window came to the front: news from the other computers now, not in up to 30 seconds
+    focus: () => void core.poll(),
     cancel: () => core.cancel(),
     close: () => core.closeJob(),
     diff: (b) => core.diff(str(b.path)),
@@ -113,7 +115,21 @@ export async function serve(core: Core, uiDir: string, wantPort = 0): Promise<Se
         const name = path.slice(5);
         if (req.method === "GET") {
           if (name === "state") return send(res, 200, core.state());
-          if (name === "items") return send(res, 200, core.items());
+          if (name === "page") {
+            const q = url.searchParams;
+            return send(
+              res,
+              200,
+              core.page(
+                (q.get("kind") ?? "") as ItemKind,
+                Number(q.get("offset")) || 0,
+                Number(q.get("limit")) || 200,
+                q.has("folder") ? (q.get("folder") ?? "") : undefined,
+              ),
+            );
+          }
+          if (name === "groups")
+            return send(res, 200, core.groups((url.searchParams.get("kind") ?? "") as ItemKind));
           if (name === "i18n") return send(res, 200, core.language());
           if (name === "old") return send(res, 200, await core.oldVersions());
           if (name === "events") {
@@ -124,7 +140,11 @@ export async function serve(core: Core, uiDir: string, wantPort = 0): Promise<Se
             });
             res.write("data: changed\n\n");
             streams.add(res);
-            req.on("close", () => streams.delete(res));
+            core.viewer(1); // a window is open: paired computers are asked for news (src/core.ts poll)
+            req.on("close", () => {
+              streams.delete(res);
+              core.viewer(-1);
+            });
             return;
           }
           return send(res, 404, { error: "not found" });

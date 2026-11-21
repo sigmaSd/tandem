@@ -30,14 +30,45 @@ Files are compared by content (SHA-256), not by date: clocks differ between comp
 times. Dates only decide whether a file must be hashed again (`src/store.ts`: unchanged size and time, and
 not modified in the last seconds, means the remembered hash is reused).
 
-## Where the base lives
+## Where the lists live
 
-One base per pair, kept outside the synced folder (in the app's own files).
+Everything Tandem remembers about files is in one SQLite database in the app's own files
+(`index.db`, `src/db.ts`), kept row by row: a change on the disk or a file a sync writes costs one row, not
+a rewrite of a list. Each list has a change number that only goes up, and a deleted file leaves a row marked
+gone, so another computer can ask "what changed since number N?" and get only that.
+
+- `folder`: this computer's synced folder, with each file's size, date and hash.
+- `drive:<copy>`: a copy on a drive, the same way.
+- `base:<copy>`: the record of the last sync with that copy (the base below).
+- `peer:<copy>` and `peerbase:<copy>`: another computer's list and its own record, followed by their
+  changes.
+
+One base per pair, kept outside the synced folder.
 
 - **Computer and drive**: on the computer. Each computer has its own base with the same drive.
 - **Two computers**: each keeps a copy. The one that starts a sync uses only the entries both remember alike
   (`agreedBase`). If a sync was cut before one side saved, the forgotten files are treated as never synced,
   which can add a file or ask a question but never delete.
+
+## Between syncs: the status of each copy
+
+The home screen says what a sync would do with each copy, without doing it (`src/status.ts`):
+
+- **This computer's folder and plugged drives** are scanned once when Tandem starts (or a drive is plugged
+  in), then followed by a watcher (`src/watch.ts`). The watcher names the paths that changed, and only those
+  are read again. Nothing reads the whole folder on a timer.
+- **A paired computer** is asked every 30 seconds while a window is open, and when the window comes to the
+  front, for its change number. Only when that moved does it send what changed. A status question is answered
+  from the list, never from the disk.
+- **Only what is known is said.** "In sync" needs both sides known. A side that can't be followed is "can't
+  tell", with why: still checking, not on the network, not plugged in, a network folder (changes made by
+  other machines make no event here), a folder that can't be watched, or a watcher that missed changes.
+- **A sync never relies on any of it.** Pressing Sync reads both disks. If that finds changes older than a
+  few seconds that the watcher never reported, the watcher is not trusted on that folder until Tandem
+  restarts, and the status says "can't tell" there.
+
+Two computers can each leave different files out (Settings → Files left out). A file left out on either side
+is neither copied nor deleted, so a file one side doesn't list never looks deleted.
 
 ## The rules that protect files
 
@@ -50,7 +81,9 @@ All in `src/store.ts`, covered by `tests/sync.test.ts`:
 - **Nothing is replaced under an author.** Every write and delete says what the comparison saw. If the
   file changed since (someone kept typing), it is skipped and reported.
 - **An interrupted sync is truthful.** The base is updated file by file, saved after every deletion, every
-  few copies, and at the end. The next sync continues from what really happened.
+  few copies, and at the end, each time only with what changed. The files reach the disk first (their
+  folders are flushed), then the record says they landed. The next sync continues from what really
+  happened.
 - **A copy that went away is not written to.** Before each write the store checks that its folder is still
   there, and for a drive that it still carries the copy's marker: a drive pulled during the review is
   reported, its folder is never made again where it was, and nothing is recorded as synced. Another
@@ -80,6 +113,14 @@ All in `src/store.ts`, covered by `tests/sync.test.ts`:
   `name.conflict-<copy>-<date>.ext`, on both sides.
 
 ## Known limits
+
+- Copying many tiny files is bound by the disk: each file is flushed before it takes its place, about 60
+  small files a second on this computer's SSD between two copies on it, fewer on a USB stick. Files are still copied
+  one at a time.
+- Watching is not proven on Windows and macOS. Network folders are recognized on Linux (from the mount
+  table) and as `\\server\share` paths on Windows; a network drive mapped to a letter on Windows, or a
+  network folder on macOS, is not recognized: it is followed like a local folder, and changes other machines
+  make there are not shown until the next Sync.
 
 - A rename is a deletion plus a new file: the content is copied again.
 - With three or more copies a change travels one sync at a time, so the longer a copy goes unsynced the more

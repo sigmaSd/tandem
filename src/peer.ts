@@ -26,7 +26,8 @@ import {
   unseal,
 } from "./secure.ts";
 
-export const PROTOCOL = 1;
+/** 2 (November 2026): lists travel as changes since a change number (src/db.ts). Both computers need it. */
+export const PROTOCOL = 2;
 
 export interface Answer {
   result?: unknown;

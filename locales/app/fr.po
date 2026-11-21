@@ -324,22 +324,6 @@ msgctxt "sync"
 msgid "Sync"
 msgstr "Synchroniser"
 
-msgctxt "onNetwork"
-msgid "On this network"
-msgstr "Sur ce réseau"
-
-msgctxt "notOnNetwork"
-msgid "Not found on the network"
-msgstr "Introuvable sur le réseau"
-
-msgctxt "pluggedIn"
-msgid "Plugged in"
-msgstr "Branché"
-
-msgctxt "notPluggedIn"
-msgid "Not plugged in"
-msgstr "Non branché"
-
 msgctxt "lastSynced"
 msgid "Last synced {when}"
 msgstr "Dernière synchronisation {when}"
@@ -351,6 +335,110 @@ msgstr "Jamais synchronisé"
 msgctxt "guestSyncing"
 msgid "{name} is syncing with this computer…"
 msgstr "{name} se synchronise avec cet ordinateur…"
+
+msgctxt "statusChecking"
+msgid "Checking…"
+msgstr "Vérification…"
+
+msgctxt "stInSync"
+msgid "In sync"
+msgstr "Synchronisé"
+
+msgctxt "stSame"
+msgid "Same files on both sides"
+msgstr "Mêmes fichiers des deux côtés"
+
+#. Status of a copy: how many files a sync would send there
+msgctxt "stSend"
+msgid "{n} to send"
+msgid_plural "{n} to send"
+msgstr[0] "{n} à envoyer"
+msgstr[1] "{n} à envoyer"
+
+msgctxt "stReceive"
+msgid "{n} to receive"
+msgid_plural "{n} to receive"
+msgstr[0] "{n} à recevoir"
+msgstr[1] "{n} à recevoir"
+
+msgctxt "stConflict"
+msgid "{n} conflict"
+msgid_plural "{n} conflicts"
+msgstr[0] "{n} conflit"
+msgstr[1] "{n} conflits"
+
+#. Status of a copy: files a sync would leave alone (unreadable, or names clashing)
+msgctxt "stOther"
+msgid "{n} left alone"
+msgid_plural "{n} left alone"
+msgstr[0] "{n} laissé tel quel"
+msgstr[1] "{n} laissés tels quels"
+
+msgctxt "stChangedHere"
+msgid "{n} file changed here"
+msgid_plural "{n} files changed here"
+msgstr[0] "{n} fichier modifié ici"
+msgstr[1] "{n} fichiers modifiés ici"
+
+msgctxt "stChangedThere"
+msgid "{n} file changed on {name}"
+msgid_plural "{n} files changed on {name}"
+msgstr[0] "{n} fichier modifié sur {name}"
+msgstr[1] "{n} fichiers modifiés sur {name}"
+
+msgctxt "stNothingHere"
+msgid "Nothing changed here"
+msgstr "Rien n'a changé ici"
+
+msgctxt "stNothingThere"
+msgid "Nothing changed on {name}"
+msgstr "Rien n'a changé sur {name}"
+
+#. A copy's status when this computer's side can't be known; {why} is one of the why… sentences
+msgctxt "stHereUnknown"
+msgid "This computer: can't tell ({why})"
+msgstr "Cet ordinateur : impossible à dire ({why})"
+
+#. A copy's status when the other side can't be known; {name} is that computer or drive, {why} one of the why… sentences
+msgctxt "stThereUnknown"
+msgid "{name}: can't tell ({why})"
+msgstr "{name} : impossible à dire ({why})"
+
+msgctxt "whyStarting"
+msgid "still checking"
+msgstr "vérification en cours"
+
+msgctxt "whyOff"
+msgid "not on the network"
+msgstr "absent du réseau"
+
+msgctxt "whyUnplugged"
+msgid "not plugged in"
+msgstr "non branché"
+
+msgctxt "whyNetwork"
+msgid "a network folder, changes made elsewhere aren't seen"
+msgstr "dossier réseau, les changements faits ailleurs ne sont pas vus"
+
+msgctxt "whyFailed"
+msgid "this folder can't be watched"
+msgstr "ce dossier ne peut pas être surveillé"
+
+msgctxt "whyMissed"
+msgid "changes were missed, Sync checks again"
+msgstr "des changements ont échappé, Synchroniser vérifie de nouveau"
+
+msgctxt "whyRefused"
+msgid "it doesn't know this computer any more"
+msgstr "il ne reconnaît plus cet ordinateur"
+
+msgctxt "whyNoFolder"
+msgid "no folder chosen there"
+msgstr "aucun dossier choisi là-bas"
+
+msgctxt "whyVersion"
+msgid "it runs another version of Tandem"
+msgstr "il utilise une autre version de Tandem"
 
 msgctxt "todayAt"
 msgid "today at {time}"
@@ -480,10 +568,6 @@ msgid_plural "{n} files left alone"
 msgstr[0] "{n} fichier laissé tel quel"
 msgstr[1] "{n} fichiers laissés tels quels"
 
-msgctxt "clashHelp"
-msgid "Their names differ only by capital letters from another file or folder ({names}). Windows and macOS can't hold both: rename one."
-msgstr "Leur nom ne diffère que par des majuscules de celui d'un autre fichier ou dossier ({names}). Windows et macOS ne peuvent pas garder les deux : renommez-en un."
-
 msgctxt "unreadTitle"
 msgid "{n} file could not be read"
 msgid_plural "{n} files could not be read"
@@ -509,6 +593,18 @@ msgid "and {n} more"
 msgid_plural "and {n} more"
 msgstr[0] "et {n} autre"
 msgstr[1] "et {n} autres"
+
+msgctxt "showMore"
+msgid "Show more"
+msgstr "Afficher plus"
+
+msgctxt "topLevel"
+msgid "Files at the top"
+msgstr "Fichiers à la racine"
+
+msgctxt "clashHelpShort"
+msgid "Their names differ only by capital letters from another file or folder. Windows and macOS can't hold both: rename one."
+msgstr "Leur nom ne diffère que par des majuscules de celui d'un autre fichier ou dossier. Windows et macOS ne peuvent pas garder les deux : renommez-en un."
 
 msgctxt "openConflictsNote"
 msgid "{n} conflict waits for your choice: it is skipped for now."

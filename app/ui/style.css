@@ -439,6 +439,30 @@ main.wide {
 .status.ok {
   color: var(--ok);
 }
+.status.news {
+  color: var(--accent);
+}
+.status.warn {
+  color: var(--warn);
+}
+.status svg {
+  width: 15px;
+  height: 15px;
+  vertical-align: -3px;
+}
+details.folder > summary {
+  cursor: pointer;
+  list-style: none;
+}
+details.folder > summary::-webkit-details-marker {
+  display: none;
+}
+details.folder > summary:hover {
+  background: var(--hover);
+}
+details.folder > .item {
+  padding-inline-start: 34px;
+}
 .dot {
   display: inline-block;
   width: 7px;
