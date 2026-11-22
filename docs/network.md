@@ -1,7 +1,7 @@
 # Two computers on the network
 
 Code: `src/secure.ts` (the cryptography), `src/peer.ts` (the listener), `src/remote.ts` (the caller),
-`src/discovery.ts` (finding each other). Tests: `tests/net.test.ts`, `tests/core.test.ts`.
+`src/discovery.ts` (finding each other). Tests: `tests/net.test.ts`, `tests/core.test.ts`, `tests/folders.test.ts`.
 
 This design uses only standard pieces from `node:crypto` (scrypt, X25519, HKDF, HMAC-SHA256, AES-256-GCM),
 combined in the usual way. **It has not been reviewed by a cryptographer.** It is meant for a home or office
@@ -49,9 +49,13 @@ Each side verifies the other's proof, so nobody in the middle can pair with eith
 2. **Messages.** Each question and answer is one AES-256-GCM message. The nonce is a counter that only
    grows, the session id and direction are authenticated with it. A repeated, reordered or redirected
    message is refused.
-3. **What can be asked** (`src/core.ts`, `#answer`, protocol 2):
-   - its status: folder name, the change numbers of its list and of its record of this pair, whether its
-     list follows its disk, its list of files left out. Answered from memory, nothing read from the disk;
+3. **What can be asked** (`src/core.ts`, `#answer`, protocol 3). Every question about files names a folder
+   shared with the caller (its id there, and the caller's own): any other folder is refused as "not
+   shared".
+   - offer a folder, take an offer back ("not on this computer"), say an offer was accepted;
+   - a folder's status: its id and name, the change numbers of its list and of its record of this pair,
+     whether its list follows its disk, its list of files left out. Answered from memory, nothing read from
+     the disk;
    - the changes of its list since a change number, in pages (with a scan of its disk first, for a sync);
      the same for its record of this pair;
    - read a piece of a file, write a file (small ones whole in one message; same rules as local writes:
@@ -63,11 +67,12 @@ Each side verifies the other's proof, so nobody in the middle can pair with eith
    computer's own clock. Writes carry the history id of the list they were planned on, and are refused when
    its folder was changed since.
 
-Two computers must run the same protocol: a Tandem of protocol 1 is shown as "runs another version".
+Two computers must run the same protocol: a Tandem of another protocol is shown as "runs another version".
 
-A paired computer is trusted with the synced folder: it can read all of it and replace any file (the
-replaced one is kept as an old version). Pair only with your own computers. Removing a copy in the settings
-forgets its key at once.
+A paired computer is trusted with the folders shared with it: it can read all of each and replace any file
+(the replaced one is kept as an old version), and nothing of the other folders. Pair only with your own
+computers. Removing a copy in a folder's settings stops it reaching that folder at once; forgetting a
+computer in the settings forgets its key.
 
 ## Not covered
 

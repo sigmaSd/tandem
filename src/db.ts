@@ -3,8 +3,7 @@
 // that only goes up. Kept file by file, so a sync or a change on the disk costs one row, not a rewrite.
 //
 // A scope is one list of files:
-//   folder            this computer's synced folder (kept by its scans and its watcher, src/store.ts)
-//   drive:<copy>      a copy on a drive, the same way
+//   folder:<id>       one of this computer's synced folders (kept by its scans and its watcher, src/store.ts)
 //   base:<copy>       what both sides held after the last sync with that copy (src/plan.ts)
 //   peer:<copy>       the last known list of another computer's folder, brought up to date with its changes
 //   peerbase:<copy>   that computer's own record of the last sync with this one
@@ -87,6 +86,20 @@ export class Db {
     this.#scopes.delete(name);
     this.sql.prepare("DELETE FROM files WHERE scope = ?").run(name);
     this.sql.prepare("DELETE FROM scopes WHERE name = ?").run(name);
+  }
+
+  /** Give a scope another name, its files and history with it (nothing when it is missing, or the name taken). */
+  rename(from: string, to: string) {
+    const has = (name: string) => !!this.sql.prepare("SELECT 1 FROM scopes WHERE name = ?").get(name);
+    if (!has(from) || has(to)) return;
+    this.transaction(() => {
+      this.sql.prepare("UPDATE files SET scope = ? WHERE scope = ?").run(to, from);
+      this.sql.prepare("UPDATE scopes SET name = ? WHERE name = ?").run(to, from);
+    });
+    for (const name of [from, to]) {
+      this.#scopes.get(name)?.forget();
+      this.#scopes.delete(name);
+    }
   }
 
   /** Every scope whose name starts with `prefix`. */

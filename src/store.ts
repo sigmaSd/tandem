@@ -1,6 +1,6 @@
 // One copy of the synced folder, as the sync sees it (src/plan.ts decides, src/apply.ts acts): list the
 // files with their content hashes, read one, write one, take one away. LocalStore is a folder on this
-// computer or on a plugged drive; src/remote.ts is the same thing on another computer, over the network.
+// computer; src/remote.ts is the same thing on another computer, over the network.
 // A LocalStore keeps its list in a scope of the database (src/db.ts): a scan reads the disk and updates it,
 // refresh() updates only the paths the watcher named (src/watch.ts), and every file a sync writes or takes
 // away is recorded as it happens.
@@ -15,7 +15,7 @@
 import { execFile } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { lstat, mkdir, open, readdir, readFile, rename, rm, rmdir, stat, utimes } from "node:fs/promises";
+import { lstat, mkdir, open, readdir, rename, rm, rmdir, stat, utimes } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { Db, type Scope } from "./db.ts";
 import { ignorer } from "./ignore.ts";
@@ -42,7 +42,7 @@ export interface LocalScan extends Scan {
 /** The file is no longer what the scan saw (edited, replaced or removed meanwhile): nothing was done. */
 export class ChangedError extends Error {}
 
-/** The copy itself is not there any more (a drive unplugged, a folder removed): nothing was done. */
+/** The copy itself is not there any more (a folder removed, a disk unmounted): nothing was done. */
 export class GoneError extends Error {}
 
 /** A file on its way in. Nothing shows in the folder until commit(). */
@@ -110,18 +110,12 @@ async function syncDir(dir: string) {
 export interface LocalOptions {
   /** Where the list of files is kept (between runs, when it is in the app's database). */
   scope?: Scope;
-  /**
-   * The id this copy's .tandem/copy.json must carry (a drive, src/drives.ts): with another drive mounted at
-   * the same place, or none, the store refuses to work rather than write somewhere else.
-   */
-  marker?: string;
 }
 
 export class LocalStore implements Store {
   readonly root: string;
   /** The list of files: unchanged files are not hashed again, and other computers ask it for changes. */
   readonly scope: Scope;
-  readonly #marker?: string;
   /** Files that are there but could not be read, and folders that could not be opened (ending in "/"). */
   readonly unread = new Set<string>();
   /** Files whose name on disk is not NFC (made on an older Mac): path as we name it → as the disk does. */
@@ -136,16 +130,12 @@ export class LocalStore implements Store {
   constructor(root: string, opts: LocalOptions = {}) {
     this.root = root;
     this.scope = opts.scope ?? new Db(":memory:").scope("folder");
-    this.#marker = opts.marker;
   }
 
-  /** Whether the copy is there: its folder exists, and it is the expected one. */
+  /** Whether the copy is there: its folder exists. */
   async present(): Promise<boolean> {
     try {
-      if (!(await stat(this.root)).isDirectory()) return false;
-      if (!this.#marker) return true;
-      const m = JSON.parse(await readFile(join(this.root, OWN, "copy.json"), "utf8")) as { id?: string };
-      return m.id === this.#marker;
+      return (await stat(this.root)).isDirectory();
     } catch {
       return false;
     }
@@ -164,7 +154,7 @@ export class LocalStore implements Store {
   async #own(...parts: string[]) {
     const own = join(this.root, OWN);
     if (!this.#ownMade) {
-      // not recursive: the folder itself must exist (never recreated where a drive used to be)
+      // not recursive: the folder itself must exist (never recreated where a disk used to be mounted)
       await mkdir(own).catch((e: NodeJS.ErrnoException) => {
         if (e.code !== "EEXIST") throw e;
       });

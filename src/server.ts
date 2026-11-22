@@ -51,15 +51,24 @@ const CHOICES = ["a", "b", "both"];
 function actions(core: Core): Record<string, (b: Record<string, unknown>) => unknown> {
   const str = (v: unknown) => (typeof v === "string" ? v : "");
   return {
-    folder: (b) => core.setFolder(str(b.path)),
-    "choose-folder": async (b) => ({
-      path: await core.chooseFolder(b.kind === "drive" ? "drive" : "folder"),
-    }),
-    "add-drive": (b) => core.addDrive(str(b.path), b.inside === true),
-    "pairing-start": async () => ({ code: await core.startPairing() }),
+    "folder-add": async (b) => ({ id: await core.addFolder(str(b.path)) }),
+    "folder-path": (b) => core.setFolderPath(str(b.folder), str(b.path)),
+    "folder-remove": (b) => core.removeFolder(str(b.folder)),
+    "folder-settings": (b) => core.setFolderSettings(str(b.folder), b),
+    "choose-folder": async () => ({ path: await core.chooseFolder() }),
+    "pairing-start": async (b) => ({ code: await core.startPairing(str(b.folder) || undefined) }),
     "pairing-stop": () => core.stopPairing(),
-    pair: (b) => core.pair(str(b.address), str(b.code)),
-    "copy-rename": (b) => core.renameCopy(str(b.id), str(b.name)),
+    pair: (b) => core.pair(str(b.address), str(b.code), str(b.folder) || undefined),
+    share: (b) => core.share(str(b.folder), str(b.device)),
+    "offer-accept": async (b) => ({
+      id: await core.acceptOffer(
+        str(b.device),
+        str(b.folder),
+        typeof b.into === "string" ? { folder: b.into } : { path: str(b.path) },
+      ),
+    }),
+    "offer-decline": (b) => core.declineOffer(str(b.device), str(b.folder)),
+    "device-forget": (b) => core.forgetDevice(str(b.device)),
     "copy-remove": (b) => core.removeCopy(str(b.id)),
     compare: (b) => core.compare(str(b.id)),
     choose: (b) =>
@@ -74,11 +83,12 @@ function actions(core: Core): Record<string, (b: Record<string, unknown>) => unk
     close: () => core.closeJob(),
     diff: (b) => core.diff(str(b.path)),
     "open-version": (b) => core.openVersion(str(b.path), b.side === "b" ? "b" : "a"),
-    restore: (b) => core.restore(str(b.stamp), str(b.path)),
-    "open-old": (b) => core.openOld(str(b.stamp), str(b.path)),
-    "open-folder": () => core.openFolder(),
+    restore: (b) => core.restore(str(b.folder), str(b.stamp), str(b.path)),
+    "open-old": (b) => core.openOld(str(b.folder), str(b.stamp), str(b.path)),
+    "open-folder": (b) => core.openFolder(str(b.folder)),
     settings: (b) => core.setSettings(b),
     "install-update": () => core.shell.installUpdate?.(),
+    "open-downloads": () => core.shell.openDownloads?.(),
   };
 }
 
@@ -131,7 +141,8 @@ export async function serve(core: Core, uiDir: string, wantPort = 0): Promise<Se
           if (name === "groups")
             return send(res, 200, core.groups((url.searchParams.get("kind") ?? "") as ItemKind));
           if (name === "i18n") return send(res, 200, core.language());
-          if (name === "old") return send(res, 200, await core.oldVersions());
+          if (name === "old")
+            return send(res, 200, await core.oldVersions(url.searchParams.get("folder") ?? ""));
           if (name === "events") {
             res.writeHead(200, {
               "content-type": "text/event-stream",

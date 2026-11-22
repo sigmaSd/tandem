@@ -2,7 +2,7 @@
 // on every system. Every path that comes from outside (another computer, the window) goes through cleanRel()
 // before it touches the disk: nothing may point outside the folder, or into Tandem's own .tandem folder.
 
-/** Tandem's own folder inside a synced folder: old versions, temporary files, the drive's marker. */
+/** Tandem's own folder inside a synced folder: old versions, temporary files. */
 export const OWN = ".tandem";
 
 export class NameError extends Error {}

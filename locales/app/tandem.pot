@@ -11,12 +11,28 @@ msgctxt "chooseFolderTitle"
 msgid "Folder to keep in sync"
 msgstr ""
 
-msgctxt "chooseDriveTitle"
-msgid "Folder on the drive"
+msgctxt "errNoSuchFolder"
+msgid "That folder is no longer kept in sync here."
 msgstr ""
 
-msgctxt "errNoFolder"
-msgid "Choose the folder to keep in sync first."
+msgctxt "errAlreadyFolder"
+msgid "That folder is already kept in sync."
+msgstr ""
+
+msgctxt "errNestedFolder"
+msgid "That folder is inside {path}, or holds it, which is already synced. Choose another one."
+msgstr ""
+
+msgctxt "errAlreadyShared"
+msgid "This folder is already shared with that computer."
+msgstr ""
+
+msgctxt "errWaiting"
+msgid "{name} hasn't accepted this folder yet. Accept it in Tandem there first."
+msgstr ""
+
+msgctxt "errUnshared"
+msgid "{name} no longer shares this folder with this computer."
 msgstr ""
 
 msgctxt "errFolder"
@@ -25,14 +41,6 @@ msgstr ""
 
 msgctxt "errInsideOwn"
 msgid "That folder belongs to Tandem itself. Choose another one."
-msgstr ""
-
-msgctxt "errSameFolder"
-msgid "That is the synced folder itself. Choose a folder on the drive."
-msgstr ""
-
-msgctxt "errNested"
-msgid "The two folders are one inside the other. Choose a folder outside the synced folder."
 msgstr ""
 
 msgctxt "errBusy"
@@ -49,14 +57,6 @@ msgstr ""
 
 msgctxt "errRefused"
 msgid "{name} no longer recognizes this computer. Remove it here, then pair the two again."
-msgstr ""
-
-msgctxt "errNoFolderThere"
-msgid "{name} has no folder chosen yet. Choose one in Tandem there first."
-msgstr ""
-
-msgctxt "errNotPlugged"
-msgid "{name} is not plugged in."
 msgstr ""
 
 msgctxt "errEmptiedHere"
@@ -163,6 +163,14 @@ msgctxt "updateReady"
 msgid "Tandem {v} is downloaded."
 msgstr ""
 
+msgctxt "updateOut"
+msgid "Tandem {v} is out."
+msgstr ""
+
+msgctxt "downloadUpdate"
+msgid "Download"
+msgstr ""
+
 msgctxt "appClosed"
 msgid "Tandem was closed. Open it again."
 msgstr ""
@@ -172,7 +180,7 @@ msgid "Choose the folder to keep in sync"
 msgstr ""
 
 msgctxt "welcomeText"
-msgid "Tandem keeps it the same on your other computers, over your own network or with a USB drive. Nothing goes to the internet."
+msgid "Tandem keeps it the same on your other computers, over your own network. Nothing goes to the internet."
 msgstr ""
 
 msgctxt "folderLabel"
@@ -200,23 +208,11 @@ msgid "Add a copy"
 msgstr ""
 
 msgctxt "whereOther"
-msgid "Where is the other copy?"
-msgstr ""
-
-msgctxt "viaNetwork"
-msgid "Another computer on this network"
+msgid "Pair with your other computer"
 msgstr ""
 
 msgctxt "viaNetworkSub"
 msgid "Both computers on at the same time, Tandem open on both"
-msgstr ""
-
-msgctxt "viaDrive"
-msgid "A USB drive or another folder"
-msgstr ""
-
-msgctxt "viaDriveSub"
-msgid "Carry it between computers that are never on together"
 msgstr ""
 
 msgctxt "showCode"
@@ -271,40 +267,75 @@ msgctxt "paired"
 msgid "Paired with {name}."
 msgstr ""
 
-msgctxt "drivesFound"
-msgid "Drives plugged in"
+msgctxt "pairedComputers"
+msgid "Computers paired already"
 msgstr ""
 
-msgctxt "noDrives"
-msgid "No drive found. Plug one in, or choose a folder."
+#. A button: offer this folder to a computer paired already
+msgctxt "shareWith"
+msgid "Share"
 msgstr ""
 
-msgctxt "driveFree"
-msgid "{size} free"
+msgctxt "offeredToast"
+msgid "“{folder}” is offered to {name}. It syncs once accepted there."
 msgstr ""
 
-msgctxt "driveHolds"
-msgid "Holds a copy of “{name}”"
+msgctxt "orNewComputer"
+msgid "Or pair another computer"
 msgstr ""
 
-msgctxt "useThisCopy"
-msgid "Use this copy"
+msgctxt "addCopyOf"
+msgid "Add a copy of “{name}”"
 msgstr ""
 
-msgctxt "alreadyAdded"
-msgid "Already added"
+msgctxt "addFolder"
+msgid "Add a folder"
 msgstr ""
 
-msgctxt "putCopyOn"
-msgid "Put a copy on it"
+msgctxt "addFolderText"
+msgid "Choose another folder to keep in sync. Each folder has its own copies: share it with the computers you want."
 msgstr ""
 
-msgctxt "chooseAnotherFolder"
-msgid "Choose another folder…"
+#. {device} is another computer, {name} the name of a folder on it
+msgctxt "offerText"
+msgid "{device} shares “{name}”"
 msgstr ""
 
-msgctxt "driveNote"
-msgid "Tandem makes its own folder on the drive and touches nothing else on it. On the second computer, plug the drive in and choose Use this copy."
+msgctxt "offerSub"
+msgid "Choose where it goes on this computer, and the two are kept in sync."
+msgstr ""
+
+msgctxt "offerChoose"
+msgid "Choose a folder…"
+msgstr ""
+
+#. A button: answer no to a folder another computer offers to share
+msgctxt "offerDecline"
+msgid "Not on this computer"
+msgstr ""
+
+msgctxt "acceptTitle"
+msgid "Where should “{name}” be on this computer?"
+msgstr ""
+
+msgctxt "acceptHelp"
+msgid "A new folder, or one of the folders already synced here. At the first sync with {device}, a file on one side only is copied to the other. Nothing is deleted."
+msgstr ""
+
+msgctxt "acceptNew"
+msgid "A new folder"
+msgstr ""
+
+msgctxt "acceptExisting"
+msgid "Or one of this computer's folders"
+msgstr ""
+
+msgctxt "useThisFolder"
+msgid "Use this folder"
+msgstr ""
+
+msgctxt "acceptedToast"
+msgid "“{name}” is now shared with {device}."
 msgstr ""
 
 msgctxt "thisComputer"
@@ -399,7 +430,7 @@ msgctxt "stHereUnknown"
 msgid "This computer: can't tell ({why})"
 msgstr ""
 
-#. A copy's status when the other side can't be known; {name} is that computer or drive, {why} one of the why… sentences
+#. A copy's status when the other side can't be known; {name} is that computer, {why} one of the why… sentences
 msgctxt "stThereUnknown"
 msgid "{name}: can't tell ({why})"
 msgstr ""
@@ -410,10 +441,6 @@ msgstr ""
 
 msgctxt "whyOff"
 msgid "not on the network"
-msgstr ""
-
-msgctxt "whyUnplugged"
-msgid "not plugged in"
 msgstr ""
 
 msgctxt "whyNetwork"
@@ -432,8 +459,24 @@ msgctxt "whyRefused"
 msgid "it doesn't know this computer any more"
 msgstr ""
 
-msgctxt "whyNoFolder"
-msgid "no folder chosen there"
+msgctxt "whyUnshared"
+msgid "it no longer shares this folder"
+msgstr ""
+
+msgctxt "whyWaiting"
+msgid "it hasn't accepted this folder yet"
+msgstr ""
+
+msgctxt "stWaiting"
+msgid "Waiting for {name} to accept this folder"
+msgstr ""
+
+msgctxt "notShared"
+msgid "Not shared with another computer yet."
+msgstr ""
+
+msgctxt "folderSettings"
+msgid "Folder settings"
 msgstr ""
 
 msgctxt "whyVersion"
@@ -499,7 +542,7 @@ msgctxt "keepMine"
 msgid "This computer's"
 msgstr ""
 
-#. A button: keep the version of the other copy, {name} is that computer's or drive's name
+#. A button: keep the version of the other copy, {name} is that computer's name
 msgctxt "keepTheirs"
 msgid "{name}'s"
 msgstr ""
@@ -765,10 +808,6 @@ msgctxt "lostHere"
 msgid "The folder on this computer could not be reached any more."
 msgstr ""
 
-msgctxt "ejectNote"
-msgid "Eject the drive before you unplug it."
-msgstr ""
-
 msgctxt "closeBothNote"
 msgid "You can now close Tandem on both computers."
 msgstr ""
@@ -789,8 +828,8 @@ msgctxt "couldNotSync"
 msgid "Could not sync with {name}"
 msgstr ""
 
-msgctxt "oldTitle"
-msgid "Old versions"
+msgctxt "oldTitleOf"
+msgid "Old versions of “{name}”"
 msgstr ""
 
 msgctxt "oldHelp"
@@ -833,7 +872,7 @@ msgid "Its address on this network: {address}"
 msgstr ""
 
 msgctxt "folderSection"
-msgid "Synced folder"
+msgid "Place on this computer"
 msgstr ""
 
 msgctxt "changeFolder"
@@ -852,16 +891,52 @@ msgctxt "noCopies"
 msgid "No copy yet."
 msgstr ""
 
-msgctxt "rename"
-msgid "Rename"
-msgstr ""
-
 msgctxt "remove"
 msgid "Remove"
 msgstr ""
 
 msgctxt "removeConfirm"
-msgid "Remove {name}? Its files are not touched; it only stops being synced with this computer."
+msgid "Remove {name}? Its files are not touched; it only stops being synced with this folder."
+msgstr ""
+
+msgctxt "computersSection"
+msgid "Paired computers"
+msgstr ""
+
+msgctxt "noComputers"
+msgid "No computer paired yet."
+msgstr ""
+
+msgctxt "sharesFolders"
+msgid "Shares {names}"
+msgstr ""
+
+msgctxt "sharesNothing"
+msgid "Shares no folder yet"
+msgstr ""
+
+msgctxt "forget"
+msgid "Forget"
+msgstr ""
+
+msgctxt "forgetConfirm"
+msgid "Forget {name}? It can no longer reach any folder here. To share again, pair the two again."
+msgstr ""
+
+msgctxt "removeFolder"
+msgid "Stop syncing this folder"
+msgstr ""
+
+msgctxt "removeFolderHelp"
+msgid "Its files stay where they are. Its copies are forgotten on this computer."
+msgstr ""
+
+msgctxt "removeFolderButton"
+msgid "Stop syncing…"
+msgstr ""
+
+msgctxt "removeFolderConfirm"
+msgid "Stop syncing “{name}”? Its files stay where they are; its copies are forgotten here."
 msgstr ""
 
 msgctxt "ignoreSection"
@@ -917,7 +992,7 @@ msgid "About"
 msgstr ""
 
 msgctxt "aboutText"
-msgid "Tandem {v}. Your files travel only between your own computers and drives, encrypted on the network. Nothing is sent to the internet."
+msgid "Tandem {v}. Your files travel only between your own computers, encrypted on the network. Nothing is sent to the internet."
 msgstr ""
 
 msgctxt "save"

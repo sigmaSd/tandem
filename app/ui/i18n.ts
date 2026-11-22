@@ -14,12 +14,14 @@ export const UI_SOURCE = {
   cancel: "Cancel",
   restartToUpdate: "Restart to update",
   updateReady: "Tandem {v} is downloaded.",
+  updateOut: "Tandem {v} is out.",
+  downloadUpdate: "Download",
   appClosed: "Tandem was closed. Open it again.",
 
   // first start
   welcomeTitle: "Choose the folder to keep in sync",
   welcomeText:
-    "Tandem keeps it the same on your other computers, over your own network or with a USB drive. Nothing goes to the internet.",
+    "Tandem keeps it the same on your other computers, over your own network. Nothing goes to the internet.",
   folderLabel: "Folder on this computer",
   folderPlaceholder: "Documents/Project",
   browse: "Browse…",
@@ -29,11 +31,8 @@ export const UI_SOURCE = {
 
   // adding a copy
   addCopy: "Add a copy",
-  whereOther: "Where is the other copy?",
-  viaNetwork: "Another computer on this network",
+  whereOther: "Pair with your other computer",
   viaNetworkSub: "Both computers on at the same time, Tandem open on both",
-  viaDrive: "A USB drive or another folder",
-  viaDriveSub: "Carry it between computers that are never on together",
   showCode: "Show a code here",
   enterCode: "Enter the other computer's code",
   showCodeButton: "Show a code",
@@ -48,16 +47,27 @@ export const UI_SOURCE = {
   pair: "Pair",
   pairing: "Pairing…",
   paired: "Paired with {name}.",
-  drivesFound: "Drives plugged in",
-  noDrives: "No drive found. Plug one in, or choose a folder.",
-  driveFree: "{size} free",
-  driveHolds: "Holds a copy of “{name}”",
-  useThisCopy: "Use this copy",
-  alreadyAdded: "Already added",
-  putCopyOn: "Put a copy on it",
-  chooseAnotherFolder: "Choose another folder…",
-  driveNote:
-    "Tandem makes its own folder on the drive and touches nothing else on it. On the second computer, plug the drive in and choose Use this copy.",
+  pairedComputers: "Computers paired already",
+  shareWith: "Share",
+  offeredToast: "“{folder}” is offered to {name}. It syncs once accepted there.",
+  orNewComputer: "Or pair another computer",
+  addCopyOf: "Add a copy of “{name}”",
+
+  // more folders, and folders other computers share
+  addFolder: "Add a folder",
+  addFolderText:
+    "Choose another folder to keep in sync. Each folder has its own copies: share it with the computers you want.",
+  offerText: "{device} shares “{name}”",
+  offerSub: "Choose where it goes on this computer, and the two are kept in sync.",
+  offerChoose: "Choose a folder…",
+  offerDecline: "Not on this computer",
+  acceptTitle: "Where should “{name}” be on this computer?",
+  acceptHelp:
+    "A new folder, or one of the folders already synced here. At the first sync with {device}, a file on one side only is copied to the other. Nothing is deleted.",
+  acceptNew: "A new folder",
+  acceptExisting: "Or one of this computer's folders",
+  useThisFolder: "Use this folder",
+  acceptedToast: "“{name}” is now shared with {device}.",
 
   // home
   thisComputer: "This computer",
@@ -82,12 +92,15 @@ export const UI_SOURCE = {
   stThereUnknown: "{name}: can't tell ({why})",
   whyStarting: "still checking",
   whyOff: "not on the network",
-  whyUnplugged: "not plugged in",
   whyNetwork: "a network folder, changes made elsewhere aren't seen",
   whyFailed: "this folder can't be watched",
   whyMissed: "changes were missed, Sync checks again",
   whyRefused: "it doesn't know this computer any more",
-  whyNoFolder: "no folder chosen there",
+  whyUnshared: "it no longer shares this folder",
+  whyWaiting: "it hasn't accepted this folder yet",
+  stWaiting: "Waiting for {name} to accept this folder",
+  notShared: "Not shared with another computer yet.",
+  folderSettings: "Folder settings",
   whyVersion: "it runs another version of Tandem",
   todayAt: "today at {time}",
   yesterdayAt: "yesterday at {time}",
@@ -186,7 +199,6 @@ export const UI_SOURCE = {
     "The files are synced, but the record of it could not be saved on {name}. The next sync may ask about files that did not change.",
   lostThere: "{name} could not be reached any more. The files already copied stay copied.",
   lostHere: "The folder on this computer could not be reached any more.",
-  ejectNote: "Eject the drive before you unplug it.",
   closeBothNote: "You can now close Tandem on both computers.",
   done: "Done",
   compareAgain: "Compare again",
@@ -194,7 +206,7 @@ export const UI_SOURCE = {
   couldNotSync: "Could not sync with {name}",
 
   // old versions
-  oldTitle: "Old versions",
+  oldTitleOf: "Old versions of “{name}”",
   oldHelp: {
     one: "Files replaced or deleted by a sync on this computer are kept here for {n} day.",
     other: "Files replaced or deleted by a sync on this computer are kept here for {n} days.",
@@ -209,14 +221,23 @@ export const UI_SOURCE = {
   nameLabel: "This computer's name",
   nameHelp: "The name the other computers show for this one.",
   addressHelp: "Its address on this network: {address}",
-  folderSection: "Synced folder",
+  folderSection: "Place on this computer",
   changeFolder: "Change…",
   changeFolderNote: "With another folder, the next sync with each copy starts like a first sync.",
   copiesSection: "Copies",
   noCopies: "No copy yet.",
-  rename: "Rename",
   remove: "Remove",
-  removeConfirm: "Remove {name}? Its files are not touched; it only stops being synced with this computer.",
+  removeConfirm: "Remove {name}? Its files are not touched; it only stops being synced with this folder.",
+  computersSection: "Paired computers",
+  noComputers: "No computer paired yet.",
+  sharesFolders: "Shares {names}",
+  sharesNothing: "Shares no folder yet",
+  forget: "Forget",
+  forgetConfirm: "Forget {name}? It can no longer reach any folder here. To share again, pair the two again.",
+  removeFolder: "Stop syncing this folder",
+  removeFolderHelp: "Its files stay where they are. Its copies are forgotten on this computer.",
+  removeFolderButton: "Stop syncing…",
+  removeFolderConfirm: "Stop syncing “{name}”? Its files stay where they are; its copies are forgotten here.",
   ignoreSection: "Files left out",
   ignoreHelp:
     "One pattern per line. Files that programs rebuild or lock are not worth syncing and cause most conflicts.",
@@ -232,7 +253,7 @@ export const UI_SOURCE = {
   languageAuto: "Like the system",
   aboutSection: "About",
   aboutText:
-    "Tandem {v}. Your files travel only between your own computers and drives, encrypted on the network. Nothing is sent to the internet.",
+    "Tandem {v}. Your files travel only between your own computers, encrypted on the network. Nothing is sent to the internet.",
   save: "Save",
   saved: "Saved",
 } satisfies Record<string, Source>;
@@ -242,10 +263,10 @@ export const UI_NOTES: Partial<Record<keyof typeof UI_SOURCE, string>> = {
   stHereUnknown:
     "A copy's status when this computer's side can't be known; {why} is one of the why… sentences",
   stThereUnknown:
-    "A copy's status when the other side can't be known; {name} is that computer or drive, {why} one of the why… sentences",
+    "A copy's status when the other side can't be known; {name} is that computer, {why} one of the why… sentences",
   stSend: "Status of a copy: how many files a sync would send there",
   stOther: "Status of a copy: files a sync would leave alone (unreadable, or names clashing)",
-  keepTheirs: "A button: keep the version of the other copy, {name} is that computer's or drive's name",
+  keepTheirs: "A button: keep the version of the other copy, {name} is that computer's name",
   keepMine: "A button: keep the version of this computer",
   keepBoth: "A button: keep both versions of the file",
   newFile: "A small label on a file that does not exist on the other side yet",
@@ -254,6 +275,9 @@ export const UI_NOTES: Partial<Record<keyof typeof UI_SOURCE, string>> = {
   compare: "A button: show the two versions of a file side by side",
   putBack: "A button: put an old version back in the folder",
   compareTitle: "The title of the side-by-side view: only the file's path",
+  offerText: "{device} is another computer, {name} the name of a folder on it",
+  shareWith: "A button: offer this folder to a computer paired already",
+  offerDecline: "A button: answer no to a folder another computer offers to share",
 };
 
 export type Key = keyof typeof UI_SOURCE;

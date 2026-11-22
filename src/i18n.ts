@@ -85,19 +85,19 @@ export class Translator {
 /** The core's and the shell's messages, in English. */
 export const CORE_SOURCE = {
   chooseFolderTitle: "Folder to keep in sync",
-  chooseDriveTitle: "Folder on the drive",
-  errNoFolder: "Choose the folder to keep in sync first.",
+  errNoSuchFolder: "That folder is no longer kept in sync here.",
+  errAlreadyFolder: "That folder is already kept in sync.",
+  errNestedFolder: "That folder is inside {path}, or holds it, which is already synced. Choose another one.",
+  errAlreadyShared: "This folder is already shared with that computer.",
+  errWaiting: "{name} hasn't accepted this folder yet. Accept it in Tandem there first.",
+  errUnshared: "{name} no longer shares this folder with this computer.",
   errFolder: "The folder {path} can't be opened: {error}",
   errInsideOwn: "That folder belongs to Tandem itself. Choose another one.",
-  errSameFolder: "That is the synced folder itself. Choose a folder on the drive.",
-  errNested: "The two folders are one inside the other. Choose a folder outside the synced folder.",
   errBusy: "A sync is already running. Wait for it to end.",
   errStale: "{name} synced with this computer since the comparison. Compare again.",
   errUnreachable:
     "{name} did not answer. Check that it is on, on the same network, and that Tandem is open there.",
   errRefused: "{name} no longer recognizes this computer. Remove it here, then pair the two again.",
-  errNoFolderThere: "{name} has no folder chosen yet. Choose one in Tandem there first.",
-  errNotPlugged: "{name} is not plugged in.",
   errEmptiedHere: {
     one: "The folder on this computer is empty, and it held {n} file at the last sync. Tandem stops here rather than delete it on the other side. If the folder is on a disk, check that the disk is there.",
     other:

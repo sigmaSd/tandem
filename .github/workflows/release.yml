@@ -1,8 +1,8 @@
 # A v* tag: the installers for every system, attached to that tag's GitHub release. Not signed (see
 # shell/electron/builder.yml); macOS ad-hoc. The release is a draft while the builds upload, and published
 # only when all of them succeeded.
-# Written in November 2026 and not run yet: the repository has no remote. The Windows and macOS packages it
-# builds have never been started by anyone.
+# The update files (latest-linux.yml, latest.yml, latest-mac.yml, *.blockmap) go up with the packages: the
+# apps read them to update. The Windows and macOS packages it builds have never been started by anyone.
 name: Release
 on:
   push:
@@ -64,7 +64,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           shopt -s nullglob
-          gh release upload "$GITHUB_REF_NAME" dist/packages/*.{AppImage,deb,rpm,exe,dmg,zip} --clobber
+          gh release upload "$GITHUB_REF_NAME" dist/packages/*.{AppImage,deb,rpm,exe,dmg,zip,blockmap} dist/packages/latest*.yml --clobber
 
   publish:
     needs: build

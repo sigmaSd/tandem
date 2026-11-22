@@ -24,14 +24,14 @@ linux:
   icon: app/icon.png
   executableName: tandem
   maintainer: Bedis Nbiba
-  synopsis: Keep a folder the same on several computers, without the cloud
-  description: Sync one folder between your computers over the local network or with a USB drive. Every change is shown before it is made, and nothing is overwritten without a copy kept.
+  synopsis: Keep folders the same on several computers, without the cloud
+  description: Sync folders between your computers over the local network. Every change is shown before it is made, and nothing is overwritten without a copy kept.
   syncDesktopName: true # the window belongs to tandem.desktop (package.json desktopName)
   desktop:
     entry:
       Name: Tandem
-      Comment: Keep a folder the same on several computers, without the cloud
-      Keywords: sync;folder;backup;usb;
+      Comment: Keep folders the same on several computers, without the cloud
+      Keywords: sync;folder;backup;network;
 appImage:
   artifactName: Tandem-${version}-${arch}.AppImage
 # the current AppImage runtime (libfuse 3 built in), as in MedStation: the old default needs FUSE 2, gone from Fedora
@@ -61,11 +61,11 @@ mac:
   identity: "-"
   hardenedRuntime: false
 
-# Automatic updates (shell/electron/updates.ts) need to know where the published versions are: still to
-# choose. Once a public repository holds the releases, for example:
-#   publish:
-#     provider: github
-#     owner: <owner>
-#     repo: tandem
-#     releaseType: draft # CI publishes it once every system's build is in (.github/workflows/release.yml)
-# Without it, the app never looks for updates and never contacts anything outside the local network.
+# Where updates come from (shell/electron/updates.ts): the GitHub releases of sigmaSd/tandem. The package
+# carries app-update.yml, and each release latest-linux.yml (latest.yml, latest-mac.yml) next to the files.
+# The app asks github.com once at launch and once a day; nothing else leaves the local network.
+publish:
+  provider: github
+  owner: sigmaSd
+  repo: tandem
+  releaseType: draft # CI publishes it once every system's build is in (.github/workflows/release.yml)

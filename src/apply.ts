@@ -1,5 +1,5 @@
 // Carrying out a plan (src/plan.ts) between two stores, one file at a time. Each file that lands updates the
-// base right away, so a sync cut short (a drive pulled, the other computer shut down) leaves a true record:
+// base right away, so a sync cut short (the other computer shut down, a disk gone) leaves a true record:
 // the next sync picks up where this one stopped. A file that changed since it was compared is skipped and
 // reported, never forced; so is a conflict the user left unanswered.
 
@@ -193,7 +193,7 @@ export async function apply(o: ApplyOptions): Promise<ApplyResult> {
         if (e instanceof ChangedError) outcomes.push({ path: act.path, result: "changed" });
         else {
           outcomes.push({ path: act.path, result: "failed", detail: (e as Error).message });
-          // a drive unplugged or a computer gone: no point failing every file after it one by one
+          // a computer gone, or this folder: no point failing every file after it one by one
           for (const side of ["a", "b"] as const) {
             if (o.alive && !(await o.alive(side).catch(() => false))) lost = side;
           }

@@ -1,6 +1,6 @@
 // What the home screen says about each copy, without touching anything: how this computer's folder and the
 // copy compare, from the lists the watchers and the last scans keep (src/db.ts). It says only what it knows.
-// A side it can't see (a computer that is off, a drive unplugged, a folder it can't watch) is "can't tell",
+// A side it can't see (a computer that is off, a folder it can't watch) is "can't tell",
 // with why: never a guess, and never "in sync" from old news.
 
 import { type Listing } from "./listing.ts";
@@ -10,12 +10,12 @@ import { plan } from "./plan.ts";
 export type Why =
   | "starting" // its first scan since Tandem started is not done
   | "off" // another computer that does not answer
-  | "unplugged" // a drive that is not there
   | "network" // a network folder: changes made elsewhere make no event here
   | "failed" // the watcher could not start, or stopped
   | "missed" // the watcher missed changes a sync then found: it is not trusted until Tandem restarts
   | "refused" // the other computer no longer knows this one
-  | "nofolder" // the other computer has no folder chosen
+  | "unshared" // the other computer no longer shares this folder with this one
+  | "waiting" // offered to the other computer, not accepted there yet
   | "version"; // the other computer runs a Tandem that speaks another protocol
 
 export type SideView = { known: true; files: Listing; unread: string[] } | { known: false; why: Why };

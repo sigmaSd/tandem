@@ -1,6 +1,6 @@
 // Another computer's copy of the folder, reached over the local network: the client side of src/peer.ts.
 // A Link is the encrypted line to one paired computer; RemoteStore makes that computer's folder look like any
-// other store (src/store.ts), so the sync itself doesn't know whether the other copy is a drive or a computer.
+// other store (src/store.ts): the sync itself works the same on any two stores.
 
 import { cleanRel, NameError } from "./names.ts";
 import { canon, PROTOCOL } from "./peer.ts";
@@ -194,6 +194,7 @@ export class Link {
     const j = answer.json as { ok: boolean; r?: unknown; code?: string; error?: string };
     if (!j.ok) {
       if (j.code === "changed") throw new ChangedError(j.error);
+      if (j.error === "not shared") throw new Refused("unshared");
       if (j.code === "name") throw new NameError(j.error);
       throw new Error(j.error ?? "error");
     }
@@ -218,14 +219,15 @@ export class Link {
 
 export interface RemoteInfo {
   name: string;
-  folder: string | null;
   version: string;
 }
 
-/** What another computer says about its folder when asked for its status (cheap: nothing is read). */
+/** What another computer says about a folder it shares when asked for its status (cheap: nothing is read). */
 export interface PeerStatus {
   name: string;
-  folder: string | null;
+  /** The folder there: its id, and its name. */
+  folder: string;
+  folderName: string;
   /** Its folder's history and change number (src/db.ts). */
   epoch: string;
   seq: number;
@@ -275,7 +277,8 @@ function checked(raw: unknown): Changes & { unread: string[]; ignore: string } {
 }
 
 /**
- * Another computer's folder as a store. Its list is followed in a local scope (`mirror`): each time, only
+ * A folder another computer shares, as a store. Every question names that folder (its id there) and this
+ * computer's own (`where`): the other computer answers only about a folder shared with this one. Its list is followed in a local scope (`mirror`): each time, only
  * what changed since the last look travels. Its record of the last sync with this computer is followed the
  * same way (`baseMirror`).
  */
@@ -295,10 +298,18 @@ export class RemoteStore implements Store {
   /** Changes asked for at once (the other computer caps it too). */
   pageSize = 20_000;
 
-  constructor(link: Link, mirror: Scope, baseMirror: Scope) {
+  readonly #where: () => { folder: string; from: string };
+
+  constructor(link: Link, mirror: Scope, baseMirror: Scope, where: () => { folder: string; from: string }) {
     this.#link = link;
     this.#mirror = mirror;
     this.#baseMirror = baseMirror;
+    this.#where = where;
+  }
+
+  /** Ask about the folder. */
+  #call(method: string, args: Record<string, unknown> = {}, payload?: Uint8Array, timeout?: number) {
+    return this.#link.call(method, { ...args, ...this.#where() }, payload, timeout);
   }
 
   async info(timeout = 8000): Promise<RemoteInfo> {
@@ -315,7 +326,7 @@ export class RemoteStore implements Store {
   }
 
   async status(timeout = 8000): Promise<PeerStatus> {
-    return (await this.#link.call("status", {}, undefined, timeout)).result as PeerStatus;
+    return (await this.#call("status", {}, undefined, timeout)).result as PeerStatus;
   }
 
   /** Whether the local copy of its list is as new as the status says. */
@@ -329,7 +340,7 @@ export class RemoteStore implements Store {
       const ask = scan && first;
       const r = checked(
         (
-          await this.#link.call(
+          await this.#call(
             "changes",
             { epoch: this.#mirror.epoch, since: this.#mirror.seq, scan: ask, limit: this.pageSize },
             undefined,
@@ -362,7 +373,7 @@ export class RemoteStore implements Store {
     for (;;) {
       const r = checked(
         (
-          await this.#link.call("baseChanges", {
+          await this.#call("baseChanges", {
             epoch: this.#baseMirror.epoch,
             since: this.#baseMirror.seq,
             limit: this.pageSize,
@@ -386,12 +397,12 @@ export class RemoteStore implements Store {
   /** Tell it the changes this sync made to the record (path, and hash or null), in pieces. */
   async saveBase(changes: [string, string | null][]) {
     for (let i = 0; i < changes.length; i += 20_000) {
-      await this.#link.call("baseApply", { token: this.#token, changes: changes.slice(i, i + 20_000) });
+      await this.#call("baseApply", { token: this.#token, changes: changes.slice(i, i + 20_000) });
     }
   }
 
   async read(path: string, offset: number, length: number): Promise<Uint8Array> {
-    return (await this.#link.call("read", { path, offset, length, token: this.#token })).payload;
+    return (await this.#call("read", { path, offset, length, token: this.#token })).payload;
   }
 
   async begin(path: string, meta: FileMeta, expect: Entry | null): Promise<Upload> {
@@ -406,30 +417,29 @@ export class RemoteStore implements Store {
           parts.push(chunk);
         },
         commit: async () =>
-          (await this.#link.call("put", { path, meta, expect, token: this.#token }, Buffer.concat(parts)))
+          (await this.#call("put", { path, meta, expect, token: this.#token }, Buffer.concat(parts)))
             .result as Entry,
         abort: async () => {},
       };
     }
-    const id = (await this.#link.call("putBegin", { path, meta, expect, token: this.#token }))
-      .result as string;
+    const id = (await this.#call("putBegin", { path, meta, expect, token: this.#token })).result as string;
     return {
-      write: async (chunk) => void (await this.#link.call("putChunk", { id }, chunk)),
-      commit: async () => (await this.#link.call("putCommit", { id })).result as Entry,
-      abort: async () => void (await this.#link.call("putAbort", { id }).catch(() => {})),
+      write: async (chunk) => void (await this.#call("putChunk", { id }, chunk)),
+      commit: async () => (await this.#call("putCommit", { id })).result as Entry,
+      abort: async () => void (await this.#call("putAbort", { id }).catch(() => {})),
     };
   }
 
   async retire(path: string, expect: Entry, _stamp: string) {
-    await this.#link.call("retire", { path, expect, token: this.#token });
+    await this.#call("retire", { path, expect, token: this.#token });
   }
 
   async checkpoint() {
-    await this.#link.call("checkpoint", { token: this.#token });
+    await this.#call("checkpoint", { token: this.#token });
   }
 
   /** Tell the other computer a sync with it just ended (its window shows the time). */
   async synced() {
-    await this.#link.call("synced").catch(() => {});
+    await this.#call("synced").catch(() => {});
   }
 }

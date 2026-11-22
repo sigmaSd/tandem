@@ -2,9 +2,10 @@
 // sends it the user's choices. No state of its own beyond what is being typed and which screen is open: after
 // each change notice it reads the state again and redraws.
 //
-// Screens, in the order a person meets them: choose the folder → add a copy (pair a computer, or a drive) →
-// home (the copies) → comparing → review (what will change, conflicts first) → syncing → done. On top of
-// those: side-by-side compare of one file, old versions, settings.
+// Screens, in the order a person meets them: choose a folder → add a copy (pair a computer, or share with one) →
+// home (each folder and its copies, and folders other computers offer) → comparing → review (what will
+// change, conflicts first) → syncing → done. On top of those: side-by-side compare of one file, old versions,
+// another folder, accepting an offered folder, a folder's settings, settings.
 
 import "./desktop.ts";
 import type { Choice } from "../../src/apply.ts";
@@ -17,6 +18,9 @@ import type { OldVersion } from "../../src/store.ts";
 import { bytes, type Key, ltr, num, setUiLang, t, when } from "./i18n.ts";
 
 type State = ReturnType<Core["state"]>;
+type FolderView = State["folders"][number];
+type CopyView = FolderView["copies"][number];
+type OfferView = State["offers"][number];
 type Diff = Awaited<ReturnType<Core["diff"]>>;
 type Kid = Node | string | null | undefined | false;
 
@@ -50,9 +54,9 @@ const ICONS = {
   check: '<circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/>',
   laptop: '<path d="M5 6h14v10H5zM3 19h18"/>',
   desktop: '<path d="M4 5h16v11H4zM8 20h8M12 16v4"/>',
-  usb: '<path d="M12 4v13M9.5 6.5 12 4l2.5 2.5M7 10v2l5 3M17 9v3l-5 3"/><circle cx="12" cy="19" r="2"/>',
   history: '<path d="M12 7v5l3 2M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 8.9M4.5 4.5v4.4h4.4"/>',
-  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/>',
+  // a cog with eight teeth (rays around a circle read as the sun: the light theme)
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M10.3 5L10.7 2.6A9.5 9.5 0 0 1 13.3 2.6L13.7 5A7.2 7.2 0 0 1 15.7 5.8L17.7 4.4A9.5 9.5 0 0 1 19.6 6.3L18.2 8.3A7.2 7.2 0 0 1 19 10.3L21.4 10.7A9.5 9.5 0 0 1 21.4 13.3L19 13.7A7.2 7.2 0 0 1 18.2 15.7L19.6 17.7A9.5 9.5 0 0 1 17.7 19.6L15.7 18.2A7.2 7.2 0 0 1 13.7 19L13.3 21.4A9.5 9.5 0 0 1 10.7 21.4L10.3 19A7.2 7.2 0 0 1 8.3 18.2L6.3 19.6A9.5 9.5 0 0 1 4.4 17.7L5.8 15.7A7.2 7.2 0 0 1 5 13.7L2.6 13.3A9.5 9.5 0 0 1 2.6 10.7L5 10.3A7.2 7.2 0 0 1 5.8 8.3L4.4 6.3A9.5 9.5 0 0 1 6.3 4.4L8.3 5.8A7.2 7.2 0 0 1 10.3 5Z"/>',
   back: '<path d="M15 6l-6 6 6 6"/>',
   folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
@@ -116,11 +120,15 @@ let reviewRev = -1;
 /** Up to this many lines a kind is shown whole; past it, by folder (conflicts: page by page). */
 const WHOLE = 300;
 const PAGE = 200;
-let view: "main" | "add" | "settings" | "old" | "compare" = "main";
+let view: "main" | "add" | "settings" | "old" | "compare" | "newFolder" | "accept" | "folder" = "main";
+/** The folder the add, old versions and folder settings screens are about. */
+let current = "";
+/** The offer being accepted. */
+let accepting: OfferView | null = null;
 /** What is being typed, kept across redraws. */
 const form = {
   folder: "",
-  via: "network" as "network" | "drive",
+  acceptPath: "",
   mode: "enter" as "show" | "enter",
   code: "",
   peer: "",
@@ -131,102 +139,215 @@ const form = {
   ignore: "",
   keepDays: "",
   dirty: false,
-  /** Settings: the copy being renamed, and the one whose removal is being confirmed. */
-  renaming: "",
-  newName: "",
+  /** Settings: the copy, folder or computer whose removal is being confirmed. */
   removing: "",
 };
 let compare: { path: string; item: Item; data?: Diff; error?: string; unfolded: Set<number> } | null = null;
 let old: OldVersion[] | null = null;
 let stopping = false;
-let copiesBefore = 0;
+/** How many copies the folder on screen had at the last redraw. */
+let copiesBefore = { folder: "", n: 0 };
 /** The review's sections the user opened or closed, by name. */
 const sectionOpen = new Map<string, boolean>();
 let lastDrawn = "";
 
-const copyOf = (id: string) => state.copies.find((c) => c.id === id);
+const folderOf = (id: string) => state.folders.find((f) => f.id === id);
+const folderOfCopy = (id: string) => state.folders.find((f) => f.copies.some((c) => c.id === id));
+const copyOf = (id: string) => folderOfCopy(id)?.copies.find((c) => c.id === id);
 const nameOf = (id: string) => copyOf(id)?.name ?? "";
+
+/** Ask the system for a folder, into a field of the form. */
+async function browse(field: "folder" | "acceptPath") {
+  const r = await call<{ path: string | null }>("choose-folder", { kind: "folder" }).catch(() => null);
+  if (r?.path) {
+    form[field] = r.path;
+    draw(true);
+  }
+}
+
+/** A folder path field with its Browse button. */
+function folderField(id: string, field: "folder" | "acceptPath", go: () => unknown, label: Key) {
+  return h(
+    "label",
+    { class: "field" },
+    h("span", null, t(label)),
+    h(
+      "div",
+      { class: "row" },
+      h("input", {
+        id,
+        type: "text",
+        class: "grow",
+        value: form[field],
+        placeholder: t("folderPlaceholder"),
+        spellcheck: "false",
+        oninput: (e: Event) => (form[field] = (e.target as HTMLInputElement).value),
+        onkeydown: (e: KeyboardEvent) => e.key === "Enter" && void go(),
+      }),
+      h("button", { onclick: () => void browse(field) }, t("browse")),
+    ),
+  );
+}
 
 // ------------------------------------------------------------------ screens
 
-function welcome(): Kid[] {
+/** The first screen, or (`again`) another folder to keep in sync: then a copy of it is added. */
+function welcome(again = false): Kid[] {
   const go = async () => {
     if (!form.folder.trim()) return;
-    if (await act("folder", { path: form.folder })) form.folder = "";
+    try {
+      const r = await call<{ id: string }>("folder-add", { path: form.folder });
+      form.folder = "";
+      form.error = "";
+      current = r.id;
+      view = "add";
+      await refresh(); // the new folder in the state before its screen is drawn
+    } catch (e) {
+      toast((e as Error).message, true);
+    }
   };
   return [
-    h("h1", null, t("welcomeTitle")),
-    h("p", { class: "lead" }, t("welcomeText")),
-    h(
-      "label",
-      { class: "field" },
-      h("span", null, t("folderLabel")),
+    again && backButton(),
+    h("h1", null, t(again ? "addFolder" : "welcomeTitle")),
+    h("p", { class: "lead" }, t(again ? "addFolderText" : "welcomeText")),
+    folderField("folder", "folder", go, "folderLabel"),
+    h("div", { class: "row right gap" }, h("button", { class: "go", onclick: go }, t("continue"))),
+    !again && offersCard(),
+    !again && h("p", { class: "note gap" }, t("secondComputerNote")),
+  ];
+}
+
+/** Folders other computers offer to share with this one. */
+function offersCard(): Kid {
+  if (!state.offers.length) return null;
+  return h(
+    "div",
+    { class: "card offers" },
+    ...state.offers.map((o) =>
       h(
         "div",
-        { class: "row" },
-        h("input", {
-          id: "folder",
-          type: "text",
-          class: "grow",
-          value: form.folder,
-          placeholder: t("folderPlaceholder"),
-          spellcheck: "false",
-          oninput: (e: Event) => (form.folder = (e.target as HTMLInputElement).value),
-          onkeydown: (e: KeyboardEvent) => e.key === "Enter" && void go(),
-        }),
+        { class: "tile" },
+        icon("desktop", "big"),
+        h(
+          "div",
+          { class: "grow" },
+          h("div", { class: "name" }, t("offerText", { device: o.device, name: o.name })),
+          h("div", { class: "sub" }, t("offerSub")),
+        ),
         h(
           "button",
           {
-            onclick: async () => {
-              const r = await call<{ path: string | null }>("choose-folder", { kind: "folder" }).catch(
-                () => null,
-              );
-              if (r?.path) {
-                form.folder = r.path;
-                draw(true);
-              }
+            class: "go",
+            onclick: () => {
+              accepting = o;
+              form.acceptPath = "";
+              view = "accept";
+              draw();
             },
           },
-          t("browse"),
+          t("offerChoose"),
+        ),
+        h(
+          "button",
+          { onclick: () => act("offer-decline", { device: o.deviceId, folder: o.folder }) },
+          t("offerDecline"),
         ),
       ),
     ),
-    h("div", { class: "row right gap" }, h("button", { class: "go", onclick: go }, t("continue"))),
-    h("p", { class: "note gap" }, t("secondComputerNote")),
+  );
+}
+
+/** Where an offered folder goes on this computer: a new folder, or one of its folders. */
+function acceptView(o: OfferView): Kid[] {
+  const send = async (body: Record<string, unknown>) => {
+    try {
+      await call("offer-accept", { device: o.deviceId, folder: o.folder, ...body });
+      accepting = null;
+      form.acceptPath = "";
+      view = "main";
+      toast(t("acceptedToast", { name: o.name, device: o.device }));
+      await refresh();
+    } catch (e) {
+      toast((e as Error).message, true);
+    }
+  };
+  const fresh = () => form.acceptPath.trim() && send({ path: form.acceptPath });
+  // a folder already linked to another folder of that computer can't take this one too
+  const usable = state.folders.filter((f) => !f.copies.some((c) => c.deviceId === o.deviceId && !c.waiting));
+  return [
+    backButton(),
+    h("h1", null, t("acceptTitle", { name: o.name })),
+    h("p", { class: "lead" }, t("acceptHelp", { device: o.device })),
+    h("h2", null, t("acceptNew")),
+    folderField("accept-path", "acceptPath", fresh, "folderLabel"),
+    h("div", { class: "row right gap" }, h("button", { class: "go", onclick: fresh }, t("continue"))),
+    usable.length > 0 && h("h2", null, t("acceptExisting")),
+    usable.length > 0 &&
+      h(
+        "div",
+        { class: "card" },
+        ...usable.map((f) =>
+          h(
+            "div",
+            { class: "tile" },
+            icon("laptop", "big"),
+            h(
+              "div",
+              { class: "grow" },
+              h("div", { class: "name" }, f.name),
+              h("div", { class: "sub mono" }, ltr(f.path)),
+            ),
+            h("button", { onclick: () => send({ into: f.id }) }, t("useThisFolder")),
+          ),
+        ),
+      ),
   ];
 }
 
-function addCopy(): Kid[] {
-  const first = !state.copies.length;
-  const option = (via: typeof form.via, title: Key, sub: Key, ic: keyof typeof ICONS) =>
-    h(
-      "button",
-      {
-        class: `option${form.via === via ? " on" : ""}`,
-        onclick: () => {
-          form.via = via;
-          form.error = "";
-          draw();
-        },
-      },
-      h("b", null, icon(ic), " ", t(title)),
-      h("span", null, t(sub)),
-    );
+function addCopy(f: FolderView): Kid[] {
+  const first = state.folders.length === 1 && !f.copies.length;
   return [
     !first && backButton(),
-    h("h1", null, first ? t("whereOther") : t("addCopy")),
-    !first && h("p", { class: "lead" }, t("whereOther")),
-    h(
-      "div",
-      { class: "options" },
-      option("network", "viaNetwork", "viaNetworkSub", "desktop"),
-      option("drive", "viaDrive", "viaDriveSub", "usb"),
-    ),
-    ...(form.via === "network" ? viaNetwork() : viaDrive()),
+    h("h1", null, first ? t("whereOther") : t("addCopyOf", { name: f.name })),
+    h("p", { class: "lead" }, t("viaNetworkSub")),
+    ...viaNetwork(f),
   ];
 }
 
-function viaNetwork(): Kid[] {
+function viaNetwork(f: FolderView): Kid[] {
+  // computers paired already: shared with in one click, no code
+  const others = state.devices.filter((d) => !f.copies.some((c) => c.deviceId === d.id));
+  const known: Kid[] = others.length
+    ? [
+        h("h2", null, t("pairedComputers")),
+        h(
+          "div",
+          { class: "card" },
+          ...others.map((d) =>
+            h(
+              "div",
+              { class: "tile" },
+              icon("desktop", "big"),
+              h("div", { class: "grow" }, h("div", { class: "name" }, d.name)),
+              h(
+                "button",
+                {
+                  class: "go",
+                  onclick: async () => {
+                    if (!(await act("share", { folder: f.id, device: d.id }))) return;
+                    view = "main";
+                    toast(t("offeredToast", { name: d.name, folder: f.name }));
+                    draw();
+                  },
+                },
+                t("shareWith"),
+              ),
+            ),
+          ),
+        ),
+        h("h2", null, t("orNewComputer")),
+      ]
+    : [];
   const tab = (mode: typeof form.mode, label: Key) =>
     h(
       "button",
@@ -244,6 +365,7 @@ function viaNetwork(): Kid[] {
   const tabs = h("div", { class: "tabs" }, tab("enter", "enterCode"), tab("show", "showCode"));
   if (form.mode === "show") {
     return [
+      ...known,
       tabs,
       state.pairing
         ? h(
@@ -266,7 +388,11 @@ function viaNetwork(): Kid[] {
         : h(
             "div",
             { class: "gap" },
-            h("button", { class: "go", onclick: () => act("pairing-start") }, t("showCodeButton")),
+            h(
+              "button",
+              { class: "go", onclick: () => act("pairing-start", { folder: f.id }) },
+              t("showCodeButton"),
+            ),
           ),
     ];
   }
@@ -280,7 +406,7 @@ function viaNetwork(): Kid[] {
     form.error = "";
     draw();
     try {
-      await call("pair", { address, code: form.code });
+      await call("pair", { address, code: form.code, folder: f.id });
       form.code = "";
       form.address = "";
     } catch (e) {
@@ -290,6 +416,7 @@ function viaNetwork(): Kid[] {
     draw(true);
   };
   return [
+    ...known,
     tabs,
     h(
       "label",
@@ -350,114 +477,11 @@ function viaNetwork(): Kid[] {
   ];
 }
 
-function viaDrive(): Kid[] {
-  const add = (path: string, inside: boolean) => async () => {
-    if (await act("add-drive", { path, inside })) view = "main";
-    draw();
-  };
-  const rows: Kid[] = [];
-  for (const d of state.drives) {
-    const copies = d.copies;
-    rows.push(
-      h(
-        "div",
-        { class: "tile" },
-        icon("usb", "big"),
-        h(
-          "div",
-          { class: "grow" },
-          h("div", { class: "name" }, d.name),
-          h("div", { class: "sub" }, t("driveFree", { size: bytes(d.free) })),
-        ),
-        !copies.length && h("button", { onclick: add(d.root, true) }, t("putCopyOn")),
-      ),
-    );
-    for (const c of copies) {
-      rows.push(
-        h(
-          "div",
-          { class: "tile" },
-          icon("folder", "big"),
-          h(
-            "div",
-            { class: "grow" },
-            h("div", { class: "name" }, t("driveHolds", { name: c.name })),
-            h("div", { class: "sub mono" }, ltr(c.path)),
-          ),
-          c.known
-            ? h("span", { class: "sub" }, t("alreadyAdded"))
-            : h("button", { class: "go", onclick: add(c.path, false) }, t("useThisCopy")),
-        ),
-      );
-    }
-  }
-  return [
-    h("h2", null, t("drivesFound")),
-    rows.length ? h("div", { class: "card" }, ...rows) : h("p", { class: "sub" }, t("noDrives")),
-    h(
-      "div",
-      { class: "row gap" },
-      h(
-        "button",
-        {
-          onclick: async () => {
-            const r = await call<{ path: string | null }>("choose-folder", { kind: "drive" }).catch(
-              () => null,
-            );
-            if (r?.path) await add(r.path, false)();
-          },
-        },
-        t("chooseAnotherFolder"),
-      ),
-    ),
-    h("p", { class: "note gap" }, t("driveNote")),
-  ];
-}
-
 function home(): Kid[] {
-  const folder = state.folder!;
   return [
-    h(
-      "div",
-      { class: "card tile" },
-      icon("laptop", "big"),
-      h(
-        "div",
-        { class: "grow" },
-        h("div", { class: "name" }, folder.name),
-        h("div", { class: "sub mono" }, ltr(folder.path)),
-      ),
-      h("button", { onclick: () => act("open-folder") }, t("openFolder")),
-    ),
+    offersCard(),
     state.guest && h("p", { class: "note" }, t("guestSyncing", { name: state.guest })),
-    h("h2", null, t("copies")),
-    h(
-      "div",
-      { class: "card" },
-      ...state.copies.map((c) =>
-        h(
-          "div",
-          { class: "tile" },
-          icon(c.kind === "drive" ? "usb" : "desktop", "big"),
-          h(
-            "div",
-            { class: "grow" },
-            h("div", { class: "name" }, c.name),
-            ...statusLines(c.status, c.name),
-            h(
-              "div",
-              { class: "sub" },
-              c.lastSync ? t("lastSynced", { when: when(c.lastSync) }) : t("neverSynced"),
-            ),
-          ),
-          h(
-            "button",
-            { class: c.available ? "go" : "", onclick: () => act("compare", { id: c.id }) },
-            t("sync"),
-          ),
-        ),
-      ),
-    ),
+    ...state.folders.map(folderCard),
     h(
       "div",
       { class: "row gap" },
@@ -465,6 +489,52 @@ function home(): Kid[] {
         "button",
         {
           onclick: () => {
+            form.folder = "";
+            view = "newFolder";
+            draw();
+          },
+        },
+        icon("plus"),
+        " ",
+        t("addFolder"),
+      ),
+    ),
+  ];
+}
+
+/** A folder on the home screen: where it is, then its copies, each with its status and Sync. */
+function folderCard(f: FolderView): HTMLElement {
+  const small = (ic: keyof typeof ICONS, label: Key, onclick: () => void) =>
+    h("button", { class: "ghost icon", title: t(label), "aria-label": t(label), onclick }, icon(ic));
+  return h(
+    "section",
+    { class: "folder-block" },
+    h(
+      "div",
+      { class: "card tile" },
+      icon("laptop", "big"),
+      h(
+        "div",
+        { class: "grow" },
+        h("div", { class: "name" }, f.name),
+        h("div", { class: "sub mono" }, ltr(f.path)),
+      ),
+      h("button", { onclick: () => act("open-folder", { folder: f.id }) }, t("openFolder")),
+      small("history", "oldVersions", () => openOld(f.id)),
+      small("gear", "folderSettings", () => openFolderSettings(f.id)),
+    ),
+    f.copies.length
+      ? h("div", { class: "card copies" }, ...f.copies.map(copyTile))
+      : h("p", { class: "sub" }, t("notShared")),
+    h(
+      "div",
+      { class: "row" },
+      h(
+        "button",
+        {
+          class: "small",
+          onclick: () => {
+            current = f.id;
             view = "add";
             form.error = "";
             draw();
@@ -475,18 +545,43 @@ function home(): Kid[] {
         t("addCopy"),
       ),
     ),
-  ];
+  );
+}
+
+function copyTile(c: CopyView): HTMLElement {
+  return h(
+    "div",
+    { class: "tile" },
+    icon("desktop", "big"),
+    h(
+      "div",
+      { class: "grow" },
+      h("div", { class: "name" }, c.name),
+      ...(c.waiting
+        ? [h("div", { class: "status" }, t("stWaiting", { name: c.name }))]
+        : [
+            ...statusLines(c.status, c.name),
+            h(
+              "div",
+              { class: "sub" },
+              c.lastSync ? t("lastSynced", { when: when(c.lastSync) }) : t("neverSynced"),
+            ),
+          ]),
+    ),
+    !c.waiting &&
+      h("button", { class: c.available ? "go" : "", onclick: () => act("compare", { id: c.id }) }, t("sync")),
+  );
 }
 
 const WHY: Record<Why, Key> = {
   starting: "whyStarting",
   off: "whyOff",
-  unplugged: "whyUnplugged",
   network: "whyNetwork",
   failed: "whyFailed",
   missed: "whyMissed",
   refused: "whyRefused",
-  nofolder: "whyNoFolder",
+  unshared: "whyUnshared",
+  waiting: "whyWaiting",
   version: "whyVersion",
 };
 
@@ -890,6 +985,7 @@ function applying(job: Extract<Job, { phase: "applying" }>): Kid[] {
 function done(job: Extract<Job, { phase: "done" }>): Kid[] {
   const s = job.summary;
   const copy = copyOf(job.copyId);
+  const folder = folderOfCopy(job.copyId);
   const name = copy?.name ?? "";
   const lines: string[] = [];
   if (s.sent) lines.push(t("sentCount", { n: s.sent }));
@@ -936,14 +1032,14 @@ function done(job: Extract<Job, { phase: "done" }>): Kid[] {
             ),
           ),
         ),
-      s.inSync && h("p", { class: "sub" }, t(copy?.kind === "drive" ? "ejectNote" : "closeBothNote")),
+      s.inSync && h("p", { class: "sub" }, t("closeBothNote")),
       h(
         "div",
         { class: "row gap wrap", style: "justify-content: center" },
         h("button", { class: "go", onclick: () => act("close") }, t("done")),
         !s.inSync && h("button", { onclick: () => act("compare", { id: job.copyId }) }, t("compareAgain")),
-        h("button", { onclick: () => act("open-folder") }, t("openFolder")),
-        s.kept > 0 && h("button", { onclick: openOld }, t("oldVersions")),
+        folder && h("button", { onclick: () => act("open-folder", { folder: folder.id }) }, t("openFolder")),
+        folder && s.kept > 0 && h("button", { onclick: () => openOld(folder.id) }, t("oldVersions")),
       ),
     ),
   ];
@@ -979,6 +1075,7 @@ function backButton() {
           if (view === "add" && state.pairing) void act("pairing-stop");
           view = "main";
           compare = null;
+          accepting = null;
           draw();
         },
       },
@@ -1102,11 +1199,12 @@ function compareFooter(): Kid[] {
   ];
 }
 
-function openOld() {
+function openOld(folderId: string) {
+  current = folderId;
   view = "old";
   old = null;
   draw();
-  call<OldVersion[]>("old").then(
+  call<OldVersion[]>(`old?folder=${encodeURIComponent(folderId)}`).then(
     (list) => {
       old = list;
       draw();
@@ -1119,11 +1217,12 @@ function openOld() {
 }
 
 function oldView(): Kid[] {
+  const folder = current;
   const groups = new Map<string, OldVersion[]>();
   for (const o of old ?? []) groups.set(o.stamp, [...(groups.get(o.stamp) ?? []), o]);
   return [
     backButton(),
-    h("h1", null, t("oldTitle")),
+    h("h1", null, t("oldTitleOf", { name: folderOf(folder)?.name ?? "" })),
     h("p", { class: "lead" }, t("oldHelp", { n: state.settings.keepDays })),
     old === null && h("p", { class: "sub" }, t("loading")),
     old !== null && !old.length && h("p", { class: "box" }, t("oldEmpty")),
@@ -1147,7 +1246,10 @@ function oldView(): Kid[] {
               ),
               h(
                 "button",
-                { class: "small", onclick: () => act("open-old", { stamp: o.stamp, path: o.path }) },
+                {
+                  class: "small",
+                  onclick: () => act("open-old", { folder, stamp: o.stamp, path: o.path }),
+                },
                 t("open"),
               ),
               h(
@@ -1155,9 +1257,9 @@ function oldView(): Kid[] {
                 {
                   class: "small",
                   onclick: async () => {
-                    if (await act("restore", { stamp: o.stamp, path: o.path })) {
+                    if (await act("restore", { folder, stamp: o.stamp, path: o.path })) {
                       toast(t("putBackDone", { path: o.path }));
-                      openOld();
+                      openOld(folder);
                     }
                   },
                 },
@@ -1172,7 +1274,7 @@ function oldView(): Kid[] {
 }
 
 async function saveSettings() {
-  if (await act("settings", { name: form.name, ignore: form.ignore, keepDays: Number(form.keepDays) })) {
+  if (await act("settings", { name: form.name, keepDays: Number(form.keepDays) })) {
     form.dirty = false;
     toast(t("saved"));
     draw();
@@ -1182,24 +1284,24 @@ async function saveSettings() {
 function openSettings() {
   view = "settings";
   form.name = state.device.name;
-  form.ignore = state.settings.ignore;
   form.keepDays = String(state.settings.keepDays);
   form.dirty = false;
-  form.renaming = "";
   form.removing = "";
   draw();
 }
 
 let languages: string[] = ["en"];
 
+/** Mark the open settings as changed: the Save button shows. */
+function touch() {
+  if (!form.dirty) {
+    form.dirty = true;
+    draw();
+  }
+}
+
 function settingsView(): Kid[] {
   const s = state.settings;
-  const touch = () => {
-    if (!form.dirty) {
-      form.dirty = true;
-      draw();
-    }
-  };
   const langName = (code: string) => {
     try {
       const n = new Intl.DisplayNames([code], { type: "language" }).of(code);
@@ -1232,58 +1334,10 @@ function settingsView(): Kid[] {
     state.addresses.length > 0 &&
       h("p", { class: "sub selectable" }, t("addressHelp", { address: state.addresses.join(", ") })),
 
-    h("h2", null, t("folderSection")),
-    h(
-      "div",
-      { class: "card tile" },
-      h("div", { class: "grow mono selectable" }, ltr(state.folder?.path ?? "")),
-      h(
-        "button",
-        {
-          onclick: async () => {
-            const r = await call<{ path: string | null }>("choose-folder", { kind: "folder" }).catch(
-              () => null,
-            );
-            if (r?.path) await act("folder", { path: r.path });
-          },
-        },
-        t("changeFolder"),
-      ),
-    ),
-    h("p", { class: "sub", style: "margin-top: 6px" }, t("changeFolderNote")),
-
-    h("h2", null, t("copiesSection")),
-    state.copies.length
-      ? h("div", { class: "card" }, ...state.copies.map((c) => copyRow(c)))
-      : h("p", { class: "sub" }, t("noCopies")),
-
-    h("h2", null, t("ignoreSection")),
-    h("p", { class: "sub", style: "margin-bottom: 6px" }, t("ignoreHelp")),
-    h("textarea", {
-      id: "ignore",
-      spellcheck: "false",
-      value: form.ignore,
-      oninput: (e: Event) => {
-        form.ignore = (e.target as HTMLTextAreaElement).value;
-        touch();
-      },
-    }),
-    h(
-      "div",
-      { class: "row", style: "margin-top: 6px" },
-      h(
-        "button",
-        {
-          class: "small",
-          onclick: () => {
-            form.ignore = s.defaultIgnore;
-            form.dirty = true;
-            draw(true);
-          },
-        },
-        t("ignoreReset"),
-      ),
-    ),
+    h("h2", null, t("computersSection")),
+    state.devices.length
+      ? h("div", { class: "card" }, ...state.devices.map((d) => deviceRow(d)))
+      : h("p", { class: "sub" }, t("noComputers")),
 
     h("h2", null, t("keepSection")),
     h(
@@ -1344,9 +1398,199 @@ function settingsView(): Kid[] {
   ];
 }
 
-/** A copy in the settings: its name and place, renamed in place, removed after a second click. */
-function copyRow(c: State["copies"][number]) {
-  const ic = icon(c.kind === "drive" ? "usb" : "desktop", "big");
+/** A paired computer in the settings: forgotten after a second click. */
+function deviceRow(d: State["devices"][number]) {
+  const ic = icon("desktop", "big");
+  if (form.removing === d.id) {
+    return h(
+      "div",
+      { class: "tile" },
+      ic,
+      h("div", { class: "grow sub" }, t("forgetConfirm", { name: d.name })),
+      h(
+        "button",
+        {
+          class: "small",
+          onclick: () => {
+            form.removing = "";
+            draw();
+          },
+        },
+        t("cancel"),
+      ),
+      h(
+        "button",
+        {
+          class: "small danger",
+          onclick: async () => {
+            form.removing = "";
+            await act("device-forget", { device: d.id });
+            draw();
+          },
+        },
+        t("forget"),
+      ),
+    );
+  }
+  const shared = state.folders.filter((f) => f.copies.some((c) => c.deviceId === d.id)).map((f) => f.name);
+  return h(
+    "div",
+    { class: "tile" },
+    ic,
+    h(
+      "div",
+      { class: "grow" },
+      h("div", { class: "name" }, d.name),
+      h(
+        "div",
+        { class: "sub" },
+        shared.length ? t("sharesFolders", { names: shared.join(", ") }) : t("sharesNothing"),
+      ),
+    ),
+    h(
+      "button",
+      {
+        class: "small danger",
+        onclick: () => {
+          form.removing = d.id;
+          draw();
+        },
+      },
+      t("forget"),
+    ),
+  );
+}
+
+function openFolderSettings(folderId: string) {
+  const f = folderOf(folderId);
+  if (!f) return;
+  current = folderId;
+  view = "folder";
+  form.ignore = f.ignore;
+  form.dirty = false;
+  form.removing = "";
+  draw();
+}
+
+/** A folder's own settings: its place, its copies, its files left out; or stop syncing it. */
+function folderView(f: FolderView): Kid[] {
+  return [
+    backButton(),
+    h("h1", null, f.name),
+
+    h("h2", null, t("folderSection")),
+    h(
+      "div",
+      { class: "card tile" },
+      h("div", { class: "grow mono selectable" }, ltr(f.path)),
+      h(
+        "button",
+        {
+          onclick: async () => {
+            const r = await call<{ path: string | null }>("choose-folder", { kind: "folder" }).catch(
+              () => null,
+            );
+            if (r?.path) await act("folder-path", { folder: f.id, path: r.path });
+          },
+        },
+        t("changeFolder"),
+      ),
+    ),
+    h("p", { class: "sub", style: "margin-top: 6px" }, t("changeFolderNote")),
+
+    h("h2", null, t("copiesSection")),
+    f.copies.length
+      ? h("div", { class: "card" }, ...f.copies.map((c) => copyRow(c)))
+      : h("p", { class: "sub" }, t("noCopies")),
+
+    h("h2", null, t("ignoreSection")),
+    h("p", { class: "sub", style: "margin-bottom: 6px" }, t("ignoreHelp")),
+    h("textarea", {
+      id: "ignore",
+      spellcheck: "false",
+      value: form.ignore,
+      oninput: (e: Event) => {
+        form.ignore = (e.target as HTMLTextAreaElement).value;
+        touch();
+      },
+    }),
+    h(
+      "div",
+      { class: "row", style: "margin-top: 6px" },
+      h(
+        "button",
+        {
+          class: "small",
+          onclick: () => {
+            form.ignore = state.settings.defaultIgnore;
+            form.dirty = true;
+            draw(true);
+          },
+        },
+        t("ignoreReset"),
+      ),
+    ),
+
+    h("h2", null, t("removeFolder")),
+    form.removing === f.id
+      ? h(
+          "div",
+          { class: "card tile" },
+          h("div", { class: "grow sub" }, t("removeFolderConfirm", { name: f.name })),
+          h(
+            "button",
+            {
+              class: "small",
+              onclick: () => {
+                form.removing = "";
+                draw();
+              },
+            },
+            t("cancel"),
+          ),
+          h(
+            "button",
+            {
+              class: "small danger",
+              onclick: async () => {
+                form.removing = "";
+                if (await act("folder-remove", { folder: f.id })) view = "main";
+                draw();
+              },
+            },
+            t("remove"),
+          ),
+        )
+      : h(
+          "div",
+          { class: "row" },
+          h("p", { class: "sub grow" }, t("removeFolderHelp")),
+          h(
+            "button",
+            {
+              class: "small danger",
+              onclick: () => {
+                form.removing = f.id;
+                draw();
+              },
+            },
+            t("removeFolderButton"),
+          ),
+        ),
+  ];
+}
+
+async function saveFolderSettings() {
+  if (await act("folder-settings", { folder: current, ignore: form.ignore })) {
+    form.dirty = false;
+    toast(t("saved"));
+    draw();
+  }
+}
+
+/** A copy in a folder's settings: removed after a second click. */
+function copyRow(c: CopyView) {
+  const ic = icon("desktop", "big");
   if (form.removing === c.id) {
     return h(
       "div",
@@ -1378,28 +1622,6 @@ function copyRow(c: State["copies"][number]) {
       ),
     );
   }
-  if (form.renaming === c.id) {
-    const done = async () => {
-      form.renaming = "";
-      if (form.newName.trim()) await act("copy-rename", { id: c.id, name: form.newName });
-      draw();
-    };
-    return h(
-      "div",
-      { class: "tile" },
-      ic,
-      h("input", {
-        id: "rename",
-        type: "text",
-        class: "grow",
-        maxlength: "40",
-        value: form.newName,
-        oninput: (e: Event) => (form.newName = (e.target as HTMLInputElement).value),
-        onkeydown: (e: KeyboardEvent) => e.key === "Enter" && void done(),
-      }),
-      h("button", { class: "small go", onclick: done }, t("save")),
-    );
-  }
   return h(
     "div",
     { class: "tile" },
@@ -1413,23 +1635,9 @@ function copyRow(c: State["copies"][number]) {
     h(
       "button",
       {
-        class: "small",
-        onclick: () => {
-          form.renaming = c.id;
-          form.newName = c.name;
-          form.removing = "";
-          draw();
-        },
-      },
-      t("rename"),
-    ),
-    h(
-      "button",
-      {
         class: "small danger",
         onclick: () => {
           form.removing = c.id;
-          form.renaming = "";
           draw();
         },
       },
@@ -1438,8 +1646,8 @@ function copyRow(c: State["copies"][number]) {
   );
 }
 
-function settingsFooter(): Kid[] {
-  return [h("span", { class: "grow" }), h("button", { class: "go", onclick: saveSettings }, t("save"))];
+function saveFooter(save: () => void): Kid[] {
+  return [h("span", { class: "grow" }), h("button", { class: "go", onclick: save }, t("save"))];
 }
 
 // ------------------------------------------------------------------ drawing
@@ -1459,15 +1667,27 @@ function draw(force = false) {
     view = "main";
     compare = null;
   }
-  // the copy asked for arrived (paired from here, or from the other computer while this one showed its code)
-  if (state.copies.length > copiesBefore && view === "add") {
+  // a screen about a folder, or an offer, that is gone (removed here, or answered elsewhere)
+  if (["add", "old", "folder"].includes(view) && !folderOf(current)) view = "main";
+  if (
+    view === "accept" &&
+    !state.offers.some((o) => o.deviceId === accepting?.deviceId && o.folder === accepting.folder)
+  ) {
     view = "main";
-    toast(t("paired", { name: state.copies.at(-1)!.name }));
+    accepting = null;
   }
-  copiesBefore = state.copies.length;
+  // the copy asked for arrived (paired from here, or from the other computer while this one showed its code)
+  const copies = folderOf(current)?.copies ?? [];
+  if (view === "add" && copiesBefore.folder === current && copies.length > copiesBefore.n) {
+    view = "main";
+    toast(t("paired", { name: copies.at(-1)!.name }));
+  }
+  copiesBefore = { folder: current, n: copies.length };
 
   const key = JSON.stringify([
     view,
+    current,
+    accepting,
     state,
     reviewRev,
     sections,
@@ -1486,13 +1706,24 @@ function draw(force = false) {
   let body: Kid[];
   let foot: Kid[] | null = null;
   let wide = false;
+  // one folder, not shared yet, nothing offered: the next step is adding a copy
+  const lonely =
+    state.folders.length === 1 && !state.folders[0].copies.length && !state.offers.length && !job;
   if (view === "settings") {
     body = settingsView();
-    if (form.dirty) foot = settingsFooter();
+    if (form.dirty) foot = saveFooter(saveSettings);
   } else if (view === "old") body = oldView();
-  else if (!state.folder) body = welcome();
-  else if (view === "add" || !state.copies.length) body = addCopy();
-  else if (view === "compare") {
+  else if (!state.folders.length) body = welcome();
+  else if (view === "newFolder") body = welcome(true);
+  else if (view === "accept" && accepting) body = acceptView(accepting);
+  else if (view === "folder") {
+    body = folderView(folderOf(current)!);
+    if (form.dirty) foot = saveFooter(saveFolderSettings);
+  } else if (view === "add") body = addCopy(folderOf(current)!);
+  else if (lonely) {
+    current = state.folders[0].id;
+    body = addCopy(state.folders[0]);
+  } else if (view === "compare") {
     body = compareView();
     foot = compareFooter();
     wide = true;
@@ -1534,17 +1765,18 @@ function draw(force = false) {
   const tools = document.getElementById("tools")!;
   const tool = (ic: keyof typeof ICONS, label: Key, onclick: () => void) =>
     h("button", { class: "ghost icon", title: t(label), "aria-label": t(label), onclick }, icon(ic));
-  tools.replaceChildren(
-    ...(state.folder && state.copies.length
-      ? [tool("history", "oldVersions", openOld), tool("gear", "settings", openSettings)]
-      : []),
-  );
+  tools.replaceChildren(...(state.folders.length ? [tool("gear", "settings", openSettings)] : []));
   const banner = document.getElementById("banner")!;
-  banner.hidden = !state.update;
+  banner.hidden = !state.update && !state.updateOut;
   if (state.update)
     banner.replaceChildren(
       h("span", { class: "grow" }, t("updateReady", { v: state.update })),
       h("button", { class: "small", onclick: () => act("install-update") }, t("restartToUpdate")),
+    );
+  else if (state.updateOut)
+    banner.replaceChildren(
+      h("span", { class: "grow" }, t("updateOut", { v: state.updateOut })),
+      h("button", { class: "small", onclick: () => act("open-downloads") }, t("downloadUpdate")),
     );
 }
 

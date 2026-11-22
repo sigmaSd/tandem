@@ -1,71 +1,22 @@
 import { put, scratch, tree } from "./_env.ts";
 import { createHash } from "node:crypto";
-import { existsSync, renameSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vite-plus/test";
 import { Core, type Job } from "../src/core.ts";
+import { copies, pair, reach, running, stopAll, syncNow, tandem } from "./_tandem.ts";
 import { Db } from "../src/db.ts";
 import { Link, RemoteStore } from "../src/remote.ts";
 
-const running: Core[] = [];
-afterEach(() => {
-  for (const c of running.splice(0)) c.stop();
-});
-
-/** A Tandem of its own: its files in a scratch folder, listening only on this computer, silent on the network. */
-async function tandem(name: string, files: Record<string, string> = {}, opts: { watch?: boolean } = {}) {
-  const core = new Core(scratch(`${name}-state`), { discovery: false, bind: "127.0.0.1", port: 0, ...opts });
-  await core.init();
-  core.config.device.name = name;
-  const folder = scratch(`${name}-folder`);
-  put(folder, files);
-  await core.setFolder(folder);
-  running.push(core);
-  return { core, folder };
-}
-
-/** Wait for the sync to reach a phase. */
-function reach<P extends Job["phase"]>(core: Core, ...phases: P[]): Promise<Extract<Job, { phase: P }>> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`still ${core.job?.phase}`)), 15_000);
-    const check = () => {
-      const job = core.job;
-      if (job?.phase === "error" && !phases.includes("error" as P)) {
-        clearTimeout(timer);
-        off();
-        return reject(new Error(job.message));
-      }
-      if (!job || !phases.includes(job.phase as P)) return;
-      clearTimeout(timer);
-      off();
-      resolve(job as Extract<Job, { phase: P }>);
-    };
-    const off = core.onChange(check);
-    check();
-  });
-}
-
-async function pair(a: Core, b: Core) {
-  const code = await a.startPairing();
-  await b.pair(`127.0.0.1:${a.port}`, code);
-  return { onA: a.config.copies.at(-1)!.id, onB: b.config.copies.at(-1)!.id };
-}
-
-/** Compare, answer nothing, apply. */
-async function syncNow(core: Core, copyId: string) {
-  core.compare(copyId);
-  const job = await reach(core, "review", "done");
-  if (job.phase === "review") core.start();
-  return (await reach(core, "done")).summary;
-}
+afterEach(stopAll);
 
 test("core: two computers pair with a code, then sync both ways over the network", async () => {
   const a = await tandem("Office PC", { "thesis.tex": "\\chapter{One}", "figures/phase.pdf": "PDF" });
   const b = await tandem("Laptop", { "refs.bib": "@book{x}" });
   const ids = await pair(a.core, b.core);
   expect(a.core.pairing).toBeNull(); // the code is used up
-  expect(a.core.config.copies.map((c) => c.name)).toEqual(["Laptop"]);
-  expect(b.core.config.copies.map((c) => c.name)).toEqual(["Office PC"]);
+  expect(a.core.state().folders[0].copies.map((c) => [c.name, c.waiting])).toEqual([["Laptop", false]]);
+  expect(b.core.state().folders[0].copies.map((c) => [c.name, c.waiting])).toEqual([["Office PC", false]]);
 
   b.core.compare(ids.onB);
   const review = await reach(b.core, "review");
@@ -81,7 +32,7 @@ test("core: two computers pair with a code, then sync both ways over the network
   expect(done.summary).toMatchObject({ sent: 1, received: 2, inSync: true, kept: 0 });
   expect(tree(a.folder)).toEqual(tree(b.folder));
   expect(Object.keys(tree(a.folder)).sort()).toEqual(["figures/phase.pdf", "refs.bib", "thesis.tex"]);
-  expect(a.core.config.copies[0].lastSync).toBeGreaterThan(0); // the other side was told
+  expect(copies(a.core)[0].lastSync).toBeGreaterThan(0); // the other side was told
   expect(a.core.state().guest).toBeNull(); // and its "Laptop is syncing with this computer" notice is gone
 
   // the other computer starts the next one: it knows what was synced, so a deletion is a deletion
@@ -148,11 +99,14 @@ test("core: an unanswered conflict leaves both files alone and the copies not in
   expect(tree(b.folder)["ch.tex"]).toBe("mine");
 });
 
-test("core: a computer removed on one side is refused, and a wrong code is burnt after five tries", async () => {
+test("core: a folder unshared, or a computer forgotten, on one side is refused, and a wrong code is burnt after five tries", async () => {
   const a = await tandem("Office PC", { "x.tex": "x" });
   const b = await tandem("Laptop");
   const ids = await pair(a.core, b.core);
   await a.core.removeCopy(ids.onA);
+  b.core.compare(ids.onB);
+  expect((await reach(b.core, "error")).message).toContain("no longer shares this folder");
+  await a.core.forgetDevice(b.core.config.device.id);
   b.core.compare(ids.onB);
   expect((await reach(b.core, "error")).message).toContain("no longer recognizes");
   expect(tree(b.folder)).toEqual({});
@@ -181,60 +135,60 @@ test("core: a paired computer reaches the synced folder and nothing else", async
   }
 });
 
-test("core: a drive carries the folder between two computers that never meet", async () => {
-  const a = await tandem("Office PC", { "thesis.tex": "v1", "fig/a.pdf": "A" });
-  const b = await tandem("Laptop");
-  const usb = scratch("usb");
-  put(usb, { "holiday.jpg": "not ours" });
-
-  // the office computer starts a copy on the drive: in a folder of its own, the drive's files untouched
-  await a.core.addDrive(usb, true);
-  const onA = a.core.config.copies[0];
-  expect(onA.kind === "drive" && onA.path).toBe(join(usb, "Office PC-folder"));
-  expect(await syncNow(a.core, onA.id)).toMatchObject({ sent: 2, inSync: true });
-  expect(tree(usb)["holiday.jpg"]).toBe("not ours");
-  expect(tree(a.folder)).toEqual({ "thesis.tex": "v1", "fig/a.pdf": "A" });
-
-  // the laptop finds that copy on the drive, and takes it
-  const copyDir = join(usb, "Office PC-folder");
-  await b.core.addDrive(copyDir);
-  const onB = b.core.config.copies[0];
-  expect(await syncNow(b.core, onB.id)).toMatchObject({ received: 2, inSync: true });
-  put(b.folder, { "thesis.tex": "v2, written on the laptop" });
-  expect(await syncNow(b.core, onB.id)).toMatchObject({ sent: 1, kept: 1 });
-
-  // back at the office
-  expect(await syncNow(a.core, onA.id)).toMatchObject({ received: 1, inSync: true });
-  expect(tree(a.folder)).toEqual({ "thesis.tex": "v2, written on the laptop", "fig/a.pdf": "A" });
-  expect((await a.core.oldVersions()).map((o) => o.path)).toEqual(["thesis.tex"]);
-
-  // unplugged: said plainly, nothing touched; plugged back under another letter: found again
-  renameSync(copyDir, join(usb, "elsewhere"));
-  a.core.compare(onA.id);
-  expect((await reach(a.core, "error")).message).toContain("not plugged in");
-  expect(a.core.state().copies[0].available).toBe(false);
-  renameSync(join(usb, "elsewhere"), copyDir);
-  expect(await syncNow(a.core, onA.id)).toMatchObject({ inSync: true });
+test("core: copies on drives from before are forgotten, their files left on the drive", async () => {
+  const a = await tandem("Office PC", { "thesis.tex": "t" });
+  const usb = scratch("old-usb");
+  put(usb, {
+    "thesis.tex": "t",
+    ".tandem/copy.json": '{"id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","name":"x"}',
+  });
+  a.core.stop();
+  const path = join(a.core.stateDir, "config.json");
+  const saved = JSON.parse(readFileSync(path, "utf8"));
+  saved.folders[0].copies.push({
+    kind: "drive",
+    id: "d1",
+    name: "USB",
+    added: 1,
+    marker: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    path: usb,
+  });
+  writeFileSync(path, JSON.stringify(saved));
+  const db = new Db(join(a.core.stateDir, "index.db"));
+  db.scope("drive:d1").put("thesis.tex", {
+    size: 1,
+    mtime: 1,
+    hash: "0000000000000000000000000000000000000000000000000000000000000000",
+  });
+  db.close();
+  const again = new Core(a.core.stateDir, { discovery: false, bind: "127.0.0.1", port: 0 });
+  await again.init();
+  running.push(again);
+  expect(again.config.folders[0].copies).toEqual([]);
+  expect(JSON.parse(readFileSync(path, "utf8")).folders[0].copies).toEqual([]);
+  expect(tree(usb, true)["thesis.tex"]).toBe("t");
+  const after = new Db(join(a.core.stateDir, "index.db"));
+  expect(after.names("drive:")).toEqual([]);
+  after.close();
 });
 
 test("core: a folder found empty after it held files stops the sync instead of deleting everything", async () => {
   const a = await tandem("Office PC", { "ch1.tex": "1", "ch2.tex": "2" });
-  const drive = scratch("emptied-drive");
-  await a.core.addDrive(drive);
-  const id = a.core.config.copies[0].id;
-  await syncNow(a.core, id);
+  const b = await tandem("Laptop");
+  const ids = await pair(a.core, b.core);
+  await syncNow(a.core, ids.onA);
   rmSync(join(a.folder, "ch1.tex"));
   rmSync(join(a.folder, "ch2.tex")); // as when the folder's disk is not mounted
-  a.core.compare(id);
+  a.core.compare(ids.onA);
   expect((await reach(a.core, "error")).message).toContain("is empty, and it held 2 files");
-  expect(tree(drive)).toEqual({ "ch1.tex": "1", "ch2.tex": "2" });
+  expect(tree(b.folder)).toEqual({ "ch1.tex": "1", "ch2.tex": "2" });
 });
 
 test("core: old versions are filed under this computer's clock, whatever the other computer's says", async () => {
   const a = await tandem("Office PC", { "thesis.tex": "the good text" });
   const b = await tandem("Old laptop");
   await pair(a.core, b.core);
-  const onB = b.core.config.copies[0];
+  const onB = copies(b.core)[0];
   if (onB.kind !== "device") throw new Error("not a device");
   // the laptop's clock is years behind: its requests carry an ancient time stamp
   const remote = new RemoteStore(
@@ -242,10 +196,11 @@ test("core: old versions are filed under this computer's clock, whatever the oth
       `127.0.0.1:${a.core.port}`,
       { id: b.core.config.device.id, port: b.core.port },
       onB.deviceId,
-      Buffer.from(onB.key, "base64"),
+      Buffer.from(b.core.config.devices[0].key, "base64"),
     ),
     new Db(":memory:").scope("peer"),
     new Db(":memory:").scope("peerbase"),
+    () => ({ folder: String(onB.remote), from: b.fid }),
   );
   const { files } = await remote.scan("");
   const up = await remote.begin(
@@ -256,35 +211,39 @@ test("core: old versions are filed under this computer's clock, whatever the oth
   await up.write(Buffer.from("abc"));
   await up.commit("20000101-000000");
   expect(tree(a.folder)).toEqual({ "thesis.tex": "abc" });
-  const [old] = await a.core.oldVersions();
+  const [old] = await a.core.oldVersions(a.fid);
   expect(old.stamp.slice(0, 4)).toBe(String(new Date().getUTCFullYear()));
   // so a restart, which drops old versions past their time, keeps it
   a.core.stop();
   const again = new Core(a.core.stateDir, { discovery: false, bind: "127.0.0.1", port: 0 });
   await again.init();
   running.push(again);
-  expect((await again.oldVersions()).map((o) => o.path)).toEqual(["thesis.tex"]);
+  expect((await again.oldVersions(a.fid)).map((o) => o.path)).toEqual(["thesis.tex"]);
 });
 
-test("core: a drive pulled while the review is open is not written to, nor remembered as synced", async () => {
+test("core: a computer gone while the review is open is not written to, nor remembered as synced", async () => {
   const a = await tandem("Office PC", { "ch1.tex": "1" });
-  const parent = scratch("pulled");
-  const drive = join(parent, "stick");
-  await a.core.addDrive(drive);
-  const id = a.core.config.copies[0].id;
-  await syncNow(a.core, id);
+  const b = await tandem("Laptop");
+  const ids = await pair(a.core, b.core);
+  await syncNow(a.core, ids.onA);
+  const synced = copies(a.core)[0].lastSync;
   put(a.folder, { "ch3.tex": "the new chapter" });
-  a.core.compare(id);
+  a.core.compare(ids.onA);
   await reach(a.core, "review");
-  renameSync(drive, join(parent, "stick-unplugged"));
+  b.core.stop();
   a.core.start();
   const done = await reach(a.core, "done");
   expect(done.summary).toMatchObject({ sent: 0, lost: "there", inSync: false });
-  expect(existsSync(drive)).toBe(false); // not made again where the drive was
-  renameSync(join(parent, "stick-unplugged"), drive);
-  a.core.compare(id);
+  expect(copies(a.core)[0].lastSync).toBe(synced);
+  expect(tree(b.folder)).toEqual({ "ch1.tex": "1" });
+  // back on: still to send, not to delete
+  const again = new Core(b.core.stateDir, { discovery: false, bind: "127.0.0.1", port: 0 });
+  await again.init();
+  running.push(again);
+  a.core.config.devices[0].address = `127.0.0.1:${again.port}`;
+  a.core.compare(ids.onA);
   await reach(a.core, "review");
-  expect(a.core.items().map((i) => [i.kind, i.path])).toEqual([["send", "ch3.tex"]]); // still to send, not to delete
+  expect(a.core.items().map((i) => [i.kind, i.path])).toEqual([["send", "ch3.tex"]]);
 });
 
 test("core: a folder changed on the other computer while the review is open receives nothing", async () => {
@@ -298,7 +257,7 @@ test("core: a folder changed on the other computer while the review is open rece
   await reach(b.core, "review");
   const other = scratch("other-project");
   put(other, { "todo.txt": "unrelated" });
-  await a.core.setFolder(other);
+  await a.core.setFolderPath(a.fid, other);
   b.core.start();
   const done = await reach(b.core, "done");
   expect(done.summary.inSync).toBe(false);
@@ -335,51 +294,40 @@ test("core: files named like things every object has are files like any other", 
   const a = await tandem("Office PC");
   for (const name of ["constructor", "__proto__", "toString", "sub/hasOwnProperty"])
     put(a.folder, { [name]: name });
-  const drive = scratch("proto-drive");
-  await a.core.addDrive(drive);
-  const id = a.core.config.copies[0].id;
-  expect(await syncNow(a.core, id)).toMatchObject({ sent: 4, inSync: true });
-  expect(Object.keys(tree(drive)).sort()).toEqual([
+  const b = await tandem("Laptop");
+  const ids = await pair(a.core, b.core);
+  expect(await syncNow(a.core, ids.onA)).toMatchObject({ sent: 4, inSync: true });
+  expect(Object.keys(tree(b.folder)).sort()).toEqual([
     "__proto__",
     "constructor",
     "sub/hasOwnProperty",
     "toString",
   ]);
-  rmSync(join(drive, "constructor"));
-  put(drive, { toString: "t2" });
-  expect(await syncNow(a.core, id)).toMatchObject({ received: 1, removed: 1, inSync: true });
+  rmSync(join(b.folder, "constructor"));
+  put(b.folder, { toString: "t2" });
+  expect(await syncNow(a.core, ids.onA)).toMatchObject({ received: 1, removed: 1, inSync: true });
   expect(Object.keys(tree(a.folder)).sort()).toEqual(["__proto__", "sub/hasOwnProperty", "toString"]);
-});
-
-test("core: the folder can't be its own copy, nor hold it", async () => {
-  const a = await tandem("Office PC", { "x.tex": "x" });
-  await expect(a.core.addDrive(a.folder)).rejects.toThrow("synced folder itself");
-  await expect(a.core.addDrive(join(a.folder, "backup"))).rejects.toThrow("inside the other");
-  await expect(a.core.addDrive(join(a.folder, ".."))).rejects.toThrow("inside the other");
-  expect(existsSync(join(a.folder, "backup"))).toBe(false);
-  expect(a.core.config.copies).toEqual([]);
 });
 
 test("core: an old version is put back from the window's list", async () => {
   const a = await tandem("Office PC", { "ch.tex": "first" });
-  const drive = scratch("old-drive");
-  await a.core.addDrive(drive);
-  const id = a.core.config.copies[0].id;
-  await syncNow(a.core, id);
-  put(drive, { "ch.tex": "second, from elsewhere" });
-  await syncNow(a.core, id);
+  const b = await tandem("Laptop");
+  const ids = await pair(a.core, b.core);
+  await syncNow(a.core, ids.onA);
+  put(b.folder, { "ch.tex": "second, from elsewhere" });
+  await syncNow(a.core, ids.onA);
   expect(tree(a.folder)).toEqual({ "ch.tex": "second, from elsewhere" });
-  const [old] = await a.core.oldVersions();
-  await a.core.restore(old.stamp, old.path);
+  const [old] = await a.core.oldVersions(a.fid);
+  await a.core.restore(a.fid, old.stamp, old.path);
   expect(tree(a.folder)).toEqual({ "ch.tex": "first" });
-  expect((await a.core.oldVersions()).length).toBe(2);
+  expect((await a.core.oldVersions(a.fid)).length).toBe(2);
 });
 
 test("core: what the window is told holds no key", async () => {
   const a = await tandem("Office PC");
   const b = await tandem("Laptop");
   await pair(a.core, b.core);
-  const key = a.core.config.copies[0].kind === "device" ? a.core.config.copies[0].key : "";
+  const key = a.core.config.devices[0].key;
   expect(key.length).toBeGreaterThan(20);
   expect(JSON.stringify(a.core.state())).not.toContain(key);
   expect(JSON.stringify(a.core.state())).not.toContain(a.core.config.device.id);
@@ -388,7 +336,10 @@ test("core: what the window is told holds no key", async () => {
 /** A copy's status once the first scans are done and the other computers were asked. */
 async function statusOf(core: Core, id: string) {
   await core.settled();
-  return core.state().copies.find((c) => c.id === id)!.status!;
+  return core
+    .state()
+    .folders.flatMap((f) => f.copies)
+    .find((c) => c.id === id)!.status!;
 }
 
 /** Wait until `check` holds (a watcher waits for the folder to be quiet before it tells). */
@@ -400,22 +351,16 @@ async function waitFor(check: () => Promise<boolean>, what: string) {
   }
 }
 
-test("core status: a drive in sync, then a change here seen by the watcher, then unplugged", async () => {
+test("core status: in sync, then a change here seen by the watcher", async () => {
   const a = await tandem("Office PC", { "ch1.tex": "1" });
-  const drive = scratch("status-drive");
-  await a.core.addDrive(drive);
-  const id = a.core.config.copies[0].id;
-  await syncNow(a.core, id);
-  const synced = await statusOf(a.core, id);
+  const b = await tandem("Laptop");
+  const ids = await pair(a.core, b.core);
+  await syncNow(a.core, ids.onA);
+  const synced = await statusOf(a.core, ids.onA);
   expect(synced).toMatchObject({ synced: true, both: { send: 0, receive: 0, conflict: 0, other: 0 } });
   put(a.folder, { "ch2.tex": "2" });
-  await waitFor(async () => (await statusOf(a.core, id)).both?.send === 1, "one file to send");
-  rmSync(`${drive}-away`, { recursive: true, force: true }); // left by an earlier run
-  renameSync(drive, `${drive}-away`);
-  const away = await statusOf(a.core, id);
-  expect(away.both).toBeUndefined();
-  expect(away.there).toEqual({ known: false, why: "unplugged" });
-  expect(away.here).toEqual({ known: true, changed: 1 }); // what changed here is still known
+  await waitFor(async () => (await statusOf(a.core, ids.onA)).both?.send === 1, "one file to send");
+  expect((await statusOf(a.core, ids.onA)).here).toEqual({ known: true, changed: 1 });
 }, 20_000);
 
 test("core status: another computer is asked for its news, and is 'can't tell' once it's off", async () => {
@@ -437,13 +382,11 @@ test("core status: another computer is asked for its news, and is 'can't tell' o
 
 test("core status: a folder that can't be watched is 'can't tell', and a sync still works", async () => {
   const a = await tandem("Office PC", { "ch1.tex": "1" }, { watch: false });
-  const drive = scratch("unwatched-drive");
-  await a.core.addDrive(drive);
-  const id = a.core.config.copies[0].id;
-  const s = await statusOf(a.core, id);
+  const b = await tandem("Laptop");
+  const ids = await pair(a.core, b.core);
+  const s = await statusOf(a.core, ids.onA);
   expect(s.here).toEqual({ known: false, why: "failed" });
-  expect(s.there).toEqual({ known: false, why: "failed" });
-  expect(await syncNow(a.core, id)).toMatchObject({ sent: 1, inSync: true });
+  expect(await syncNow(a.core, ids.onA)).toMatchObject({ sent: 1, inSync: true });
 });
 
 test("core: the review comes in pages and in folders", async () => {
@@ -451,8 +394,9 @@ test("core: the review comes in pages and in folders", async () => {
   for (let i = 0; i < 12; i++) files[`fig/f${i}.pdf`] = String(i);
   for (let i = 0; i < 5; i++) files[`ch/c${i}.tex`] = String(i);
   const a = await tandem("Office PC", files);
-  await a.core.addDrive(scratch("paged-drive"));
-  a.core.compare(a.core.config.copies[0].id);
+  const b = await tandem("Laptop");
+  const ids = await pair(a.core, b.core);
+  a.core.compare(ids.onA);
   await reach(a.core, "review");
   const first = a.core.page("send", 0, 5);
   expect(first.total).toBe(19);
@@ -474,7 +418,7 @@ test("core: another computer's list arrives in pages, then only its changes", as
   const b = await tandem("Laptop");
   await pair(a.core, b.core);
   await a.core.settled();
-  const onB = b.core.config.copies[0];
+  const onB = copies(b.core)[0];
   if (onB.kind !== "device") throw new Error("not a device");
   const mirror = new Db(":memory:").scope("peer");
   const remote = new RemoteStore(
@@ -482,10 +426,11 @@ test("core: another computer's list arrives in pages, then only its changes", as
       `127.0.0.1:${a.core.port}`,
       { id: b.core.config.device.id, port: b.core.port },
       onB.deviceId,
-      Buffer.from(onB.key, "base64"),
+      Buffer.from(b.core.config.devices[0].key, "base64"),
     ),
     mirror,
     new Db(":memory:").scope("peerbase"),
+    () => ({ folder: String(onB.remote), from: b.fid }),
   );
   remote.pageSize = 2;
   await remote.pull(false);
@@ -510,22 +455,25 @@ test("core: another computer's list arrives in pages, then only its changes", as
 }, 20_000);
 
 test("core: the records of Tandem 0.1.0 move into the database, so the next sync is not a first sync", async () => {
-  const a = await tandem("Office PC", { "kept.tex": "k" });
-  const drive = scratch("upgrade-drive");
-  put(drive, { "kept.tex": "k", "deleted-here.tex": "d" });
-  await a.core.addDrive(drive);
-  const id = a.core.config.copies[0].id;
+  const a = await tandem("Office PC", { "kept.tex": "k", "deleted-here.tex": "d" });
+  const b = await tandem("Laptop");
+  const ids = await pair(a.core, b.core);
+  await syncNow(a.core, ids.onA);
   const hash = (t: string) => createHash("sha256").update(t).digest("hex");
   a.core.stop();
-  // as 0.1.0 left it: both files were synced, then deleted-here.tex was deleted on this computer
+  // as 0.1.0 left it: the record in base/<copy>.json, then deleted-here.tex deleted on this computer
+  const db = new Db(join(a.core.stateDir, "index.db"));
+  db.drop(`base:${ids.onA}`);
+  db.close();
   put(a.core.stateDir, {
-    [`base/${id}.json`]: JSON.stringify({ "kept.tex": hash("k"), "deleted-here.tex": hash("d") }),
+    [`base/${ids.onA}.json`]: JSON.stringify({ "kept.tex": hash("k"), "deleted-here.tex": hash("d") }),
   });
+  rmSync(join(a.folder, "deleted-here.tex"));
   const again = new Core(a.core.stateDir, { discovery: false, bind: "127.0.0.1", port: 0 });
   await again.init();
   running.push(again);
   expect(existsSync(join(a.core.stateDir, "base"))).toBe(false);
-  const summary = await syncNow(again, id);
+  const summary = await syncNow(again, ids.onA);
   expect(summary).toMatchObject({ removed: 1, inSync: true }); // a deletion, not a file brought back
-  expect(tree(drive)).toEqual({ "kept.tex": "k" });
+  expect(tree(b.folder)).toEqual({ "kept.tex": "k" });
 });

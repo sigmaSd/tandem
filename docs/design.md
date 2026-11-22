@@ -30,6 +30,32 @@ Files are compared by content (SHA-256), not by date: clocks differ between comp
 times. Dates only decide whether a file must be hashed again (`src/store.ts`: unchanged size and time, and
 not modified in the last seconds, means the remembered hash is reused).
 
+## Several folders
+
+Each folder kept in sync has its own copies, its own list of files left out, and its own old versions
+(`.tandem/old/` inside it). A sync is always between one folder and one of its copies, one sync at a time.
+
+Paired computers are separate from folders. Pairing (`docs/network.md`) makes two computers trust each other;
+it shares nothing by itself. A folder is then **offered** to a paired computer and **accepted** there into a
+folder of that computer's choosing: a new one, or one it already syncs. From then on the two folders are
+**linked** by their ids, each computer's own, never by their names or places: either side can rename or
+move its folder, and two folders named alike stay apart.
+
+- Offered while both people are on a folder's "add a copy" screen during pairing, the two folders are linked
+  at once: choosing the folder, then pairing, stays one step.
+- An offer made while the other computer is off is made again at the next look.
+- "Not on this computer" is remembered: the same offer again is answered no without asking, and the offering
+  side takes its copy back.
+- A paired computer reaches only the folders linked to it (`src/core.ts`, `#shared`): every request names
+  the folder, and anything else is refused.
+- A folder can't be inside another synced folder, nor hold one: its files would be synced twice.
+- Stopping syncing a folder forgets its copies and records; its files stay where they are.
+
+Tandem 0.2.0 had one folder: it becomes the first folder, its paired computers stay paired with that folder
+shared, and its list and records keep their history, so the next sync is not a first sync. Which folder it
+is on the other computer is learned at the first exchange once both are updated. Its copies on drives are forgotten
+(Tandem no longer syncs with drives); their files stay on the drives.
+
 ## Where the lists live
 
 Everything Tandem remembers about files is in one SQLite database in the app's own files
@@ -37,31 +63,28 @@ Everything Tandem remembers about files is in one SQLite database in the app's o
 a rewrite of a list. Each list has a change number that only goes up, and a deleted file leaves a row marked
 gone, so another computer can ask "what changed since number N?" and get only that.
 
-- `folder`: this computer's synced folder, with each file's size, date and hash.
-- `drive:<copy>`: a copy on a drive, the same way.
+- `folder:<id>`: one of this computer's synced folders, with each file's size, date and hash.
 - `base:<copy>`: the record of the last sync with that copy (the base below).
 - `peer:<copy>` and `peerbase:<copy>`: another computer's list and its own record, followed by their
   changes.
 
-One base per pair, kept outside the synced folder.
-
-- **Computer and drive**: on the computer. Each computer has its own base with the same drive.
-- **Two computers**: each keeps a copy. The one that starts a sync uses only the entries both remember alike
-  (`agreedBase`). If a sync was cut before one side saved, the forgotten files are treated as never synced,
-  which can add a file or ask a question but never delete.
+One base per pair (a folder and one of its copies), kept outside the synced folder. Each computer keeps a
+copy of it. The one that starts a sync uses only the entries both remember alike
+(`agreedBase`). If a sync was cut before one side saved, the forgotten files are treated as never synced,
+which can add a file or ask a question but never delete.
 
 ## Between syncs: the status of each copy
 
 The home screen says what a sync would do with each copy, without doing it (`src/status.ts`):
 
-- **This computer's folder and plugged drives** are scanned once when Tandem starts (or a drive is plugged
-  in), then followed by a watcher (`src/watch.ts`). The watcher names the paths that changed, and only those
+- **This computer's folders** are scanned once when Tandem starts (or when a folder is added), then
+  followed by a watcher (`src/watch.ts`). The watcher names the paths that changed, and only those
   are read again. Nothing reads the whole folder on a timer.
 - **A paired computer** is asked every 30 seconds while a window is open, and when the window comes to the
   front, for its change number. Only when that moved does it send what changed. A status question is answered
   from the list, never from the disk.
 - **Only what is known is said.** "In sync" needs both sides known. A side that can't be followed is "can't
-  tell", with why: still checking, not on the network, not plugged in, a network folder (changes made by
+  tell", with why: still checking, not on the network, not accepted there yet, no longer shared, a network folder (changes made by
   other machines make no event here), a folder that can't be watched, or a watcher that missed changes.
 - **A sync never relies on any of it.** Pressing Sync reads both disks. If that finds changes older than a
   few seconds that the watcher never reported, the watcher is not trusted on that folder until Tandem
@@ -85,10 +108,9 @@ All in `src/store.ts`, covered by `tests/sync.test.ts`:
   folders are flushed), then the record says they landed. The next sync continues from what really
   happened.
 - **A copy that went away is not written to.** Before each write the store checks that its folder is still
-  there, and for a drive that it still carries the copy's marker: a drive pulled during the review is
-  reported, its folder is never made again where it was, and nothing is recorded as synced. Another
-  computer's folder is named by a token for the run: requests planned against a folder changed since are
-  refused.
+  there: a folder whose disk is gone during the review is reported, never made again where it was, and
+  nothing is recorded as synced. Another computer's folder is named by a token for the run: requests planned
+  against a folder changed since are refused.
 - **A stale review is not carried out.** If the other computer synced with this one while a review sat
   open, Start asks to compare again.
 - **Old versions are filed under the local clock.** A computer whose clock is wrong can't age another
@@ -115,8 +137,7 @@ All in `src/store.ts`, covered by `tests/sync.test.ts`:
 ## Known limits
 
 - Copying many tiny files is bound by the disk: each file is flushed before it takes its place, about 60
-  small files a second on this computer's SSD between two copies on it, fewer on a USB stick. Files are still copied
-  one at a time.
+  small files a second on this computer's SSD. Files are still copied one at a time.
 - Watching is not proven on Windows and macOS. Network folders are recognized on Linux (from the mount
   table) and as `\\server\share` paths on Windows; a network drive mapped to a letter on Windows, or a
   network folder on macOS, is not recognized: it is followed like a local folder, and changes other machines
@@ -131,6 +152,4 @@ All in `src/store.ts`, covered by `tests/sync.test.ts`:
 - With three copies synced pair by pair, a file deleted through one pair and put back with the same content
   on a third computer can be deleted again by a later sync of another pair. The review shows it, and the
   file is kept as an old version.
-- A drive's base is kept on each computer, not on the drive: a drive restored from an older image looks to
-  each computer like files were deleted or changed on it.
 - The pairing keys are stored in the app's own folder, readable by the user account only, not encrypted.

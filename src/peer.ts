@@ -1,7 +1,7 @@
 // The door other computers knock on: a small HTTP listener on the local network (src/remote.ts is the
 // client side). Nothing here trusts the network: a computer gets in only with the key made when it was paired
 // (src/secure.ts), and everything it then asks travels encrypted. What it may ask is decided by the host
-// (src/core.ts `call`): the files of the synced folder, nothing else on this computer.
+// (src/core.ts `#answer`): the files of the folders shared with that computer, nothing else on this one.
 //
 //   GET  /hello     who this is (name, id, whether it is showing a pairing code): public, like a name tag
 //   POST /pair      become a pair, for who knows the code this computer shows
@@ -26,8 +26,11 @@ import {
   unseal,
 } from "./secure.ts";
 
-/** 2 (November 2026): lists travel as changes since a change number (src/db.ts). Both computers need it. */
-export const PROTOCOL = 2;
+/**
+ * 2 (November 2026): lists travel as changes since a change number (src/db.ts). 3: several folders, each
+ * request naming one shared with the caller. Both computers need the same.
+ */
+export const PROTOCOL = 3;
 
 export interface Answer {
   result?: unknown;

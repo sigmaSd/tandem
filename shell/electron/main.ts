@@ -15,7 +15,7 @@ import { cookieName } from "../../src/guard.ts";
 import { msg } from "../../src/i18n.ts";
 import { serve } from "../../src/server.ts";
 import { appMenu } from "./menu.ts";
-import { installNow, watchUpdates } from "./updates.ts";
+import { DOWNLOADS, installNow, watchUpdates } from "./updates.ts";
 import { openWindow } from "./windows.ts";
 
 /** The application's files: the checkout, or the package (this file is dist/app/electron.mjs in both). */
@@ -118,6 +118,7 @@ async function main() {
     },
     setTheme: (theme) => (nativeTheme.themeSource = themeSource(theme)),
     installUpdate: installNow,
+    openDownloads: () => void shell.openExternal(DOWNLOADS),
   };
   await core.init();
   nativeTheme.themeSource = themeSource(core.config.theme);
@@ -130,10 +131,16 @@ async function main() {
     httpOnly: true,
     sameSite: "strict",
   });
-  watchUpdates((version) => {
-    core.update = version; // offered in the window: "Restart to update"
-    core.changed();
-  });
+  watchUpdates(
+    (version) => {
+      core.update = version; // offered in the window: "Restart to update"
+      core.changed();
+    },
+    (version) => {
+      core.updateOut = version; // a .rpm or .deb: "Tandem 0.4.0 is out", with a button to download it
+      core.changed();
+    },
+  );
 
   app.on("before-quit", () => {
     quitting = true;
