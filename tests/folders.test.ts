@@ -110,7 +110,7 @@ test("folders: an offer made while the other computer is off arrives at the next
   const a = await tandem("Office PC", { "thesis.tex": "t" });
   const b = await tandem("Laptop");
   await pair(a.core, b.core);
-  b.core.stop();
+  await b.core.stop();
   const notes = await folder(a.core, "Office PC-notes", { "n.md": "n" });
   await a.core.share(notes.fid, b.core.config.device.id);
   expect(linked(a.core, notes.fid).remote).toBeNull();
@@ -206,7 +206,7 @@ test("folders: Tandem 0.2.0's one folder and its pairs carry over, and the next 
   await syncNow(b.core, ids.onB);
   // as 0.2.0 kept them: one folder, the pairs as its copies with their keys, the folder's list as "folder"
   for (const { core, fid } of [a, b]) {
-    core.stop();
+    await core.stop();
     const f = core.config.folders[0];
     const dev = core.config.devices[0];
     const copy = f.copies[0] as DeviceCopy;

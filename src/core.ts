@@ -377,6 +377,10 @@ export class Core {
   #lastEmit = 0;
   #emitTimer?: ReturnType<typeof setTimeout>;
   #stopped = false;
+  /** Resolves once stopped and the database closed. */
+  #closed?: Promise<void>;
+  /** The comparison or the sync running now. */
+  #running: Promise<void> | null = null;
 
   constructor(stateDir: string, options: CoreOptions = {}) {
     this.stateDir = stateDir;
@@ -533,7 +537,13 @@ export class Core {
     for (const old of ["base", "cache"]) await rm(join(this.stateDir, old), { recursive: true, force: true });
   }
 
-  stop() {
+  /**
+   * Stop: nothing new starts, the running sync stops after its file, files on their way here are dropped, and
+   * once what was under way has landed (or after a few seconds) the database is closed. Windows can't delete
+   * an open file: until then the app's own folder can't be removed.
+   */
+  stop(): Promise<void> {
+    if (this.#closed) return this.#closed;
     this.#stopped = true;
     for (const t of [
       this.#pairTimer,
@@ -548,6 +558,19 @@ export class Core {
     for (const f of this.#folders.values()) f.watcher?.stop();
     this.#discovery?.stop();
     this.#peer.close();
+    for (const [id, u] of this.#uploads) {
+      void u.upload.abort();
+      this.#uploads.delete(id);
+    }
+    const underway = Promise.allSettled([
+      this.#running,
+      this.#polling,
+      ...[...this.#folders.values()].map((s) => s.store.idle()),
+    ]);
+    this.#closed = Promise.race([underway, new Promise((r) => setTimeout(r, 5000))]).then(() =>
+      this.#db.close(),
+    );
+    return this.#closed;
   }
 
   /** The port other computers reach this one on. */
@@ -1323,7 +1346,15 @@ export class Core {
       if (actions.every((x) => x.kind === "settle")) return await this.#apply(); // nothing to ask: done
       this.#review();
     };
-    void run().catch((e: Error) => this.#failed(copyId, e));
+    this.#track(run().catch((e: Error) => this.#failed(copyId, e)));
+  }
+
+  /** Remember the comparison or sync under way: stop() waits for it. */
+  #track(p: Promise<void>) {
+    this.#running = p;
+    void p.finally(() => {
+      if (this.#running === p) this.#running = null;
+    });
   }
 
   #kindOf(act: Action): ItemKind | null {
@@ -1334,6 +1365,7 @@ export class Core {
   }
 
   #failed(copyId: string, e: Error) {
+    if (this.#stopped) return; // stopped under it: nothing to tell
     if (!(e instanceof UserError)) console.error(e);
     this.#work = null;
     this.job = { phase: "error", copyId, message: e.message };
@@ -1418,7 +1450,7 @@ export class Core {
   /** Carry out the plan as reviewed. */
   start() {
     if (this.job?.phase !== "review" || !this.#work) return;
-    void this.#apply().catch((e: Error) => this.#failed(this.#work?.copy.id ?? "", e));
+    this.#track(this.#apply().catch((e: Error) => this.#failed(this.#work?.copy.id ?? "", e)));
   }
 
   async #apply() {

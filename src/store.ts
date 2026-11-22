@@ -164,6 +164,11 @@ export class LocalStore implements Store {
     return join(own, ...parts);
   }
 
+  /** Resolves once the scan or refresh under way (if any) is done. */
+  idle(): Promise<void> {
+    return this.#lock.then(() => {});
+  }
+
   /** One at a time: a scan and a refresh of the same folder never interleave. */
   #exclusive<T>(fn: () => Promise<T>): Promise<T> {
     const run = this.#lock.then(fn, fn);

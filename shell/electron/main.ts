@@ -144,7 +144,7 @@ async function main() {
 
   app.on("before-quit", () => {
     quitting = true;
-    core.stop();
+    void core.stop();
     served.close();
   });
   app.on("second-instance", () => {

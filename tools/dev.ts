@@ -38,7 +38,6 @@ const served = await serve(core, join(root, "app", "ui", "dist"), Number(arg("po
 console.log(`Tandem: ${served.origin}/?k=${served.secret}`);
 console.log(`other computers reach it on port ${core.port}`);
 process.on("SIGINT", () => {
-  core.stop();
   served.close();
-  process.exit(0);
+  void core.stop().finally(() => process.exit(0));
 });

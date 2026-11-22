@@ -142,7 +142,7 @@ test("core: copies on drives from before are forgotten, their files left on the 
     "thesis.tex": "t",
     ".tandem/copy.json": '{"id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","name":"x"}',
   });
-  a.core.stop();
+  await a.core.stop();
   const path = join(a.core.stateDir, "config.json");
   const saved = JSON.parse(readFileSync(path, "utf8"));
   saved.folders[0].copies.push({
@@ -214,7 +214,7 @@ test("core: old versions are filed under this computer's clock, whatever the oth
   const [old] = await a.core.oldVersions(a.fid);
   expect(old.stamp.slice(0, 4)).toBe(String(new Date().getUTCFullYear()));
   // so a restart, which drops old versions past their time, keeps it
-  a.core.stop();
+  await a.core.stop();
   const again = new Core(a.core.stateDir, { discovery: false, bind: "127.0.0.1", port: 0 });
   await again.init();
   running.push(again);
@@ -230,7 +230,7 @@ test("core: a computer gone while the review is open is not written to, nor reme
   put(a.folder, { "ch3.tex": "the new chapter" });
   a.core.compare(ids.onA);
   await reach(a.core, "review");
-  b.core.stop();
+  await b.core.stop();
   a.core.start();
   const done = await reach(a.core, "done");
   expect(done.summary).toMatchObject({ sent: 0, lost: "there", inSync: false });
@@ -373,7 +373,7 @@ test("core status: another computer is asked for its news, and is 'can't tell' o
   await waitFor(async () => (await statusOf(a.core, ids.onA)).both?.receive === 1, "one file to receive");
   expect((await statusOf(a.core, ids.onA)).there).toEqual({ known: true, changed: 1 });
   expect(b.core.state().guest).toBeNull(); // being asked for news is not a sync
-  b.core.stop();
+  await b.core.stop();
   const off = await statusOf(a.core, ids.onA);
   expect(off.there).toEqual({ known: false, why: "off" });
   expect(off.here).toEqual({ known: true, changed: 0 });
@@ -460,7 +460,7 @@ test("core: the records of Tandem 0.1.0 move into the database, so the next sync
   const ids = await pair(a.core, b.core);
   await syncNow(a.core, ids.onA);
   const hash = (t: string) => createHash("sha256").update(t).digest("hex");
-  a.core.stop();
+  await a.core.stop();
   // as 0.1.0 left it: the record in base/<copy>.json, then deleted-here.tex deleted on this computer
   const db = new Db(join(a.core.stateDir, "index.db"));
   db.drop(`base:${ids.onA}`);

@@ -54,7 +54,7 @@ test("watch: new, changed, renamed and deleted files and folders reach the list 
   expect(store.scope.get("ch1.tex")?.size).toBe(13);
   expect(store.scope.seq).toBeGreaterThan(seq);
   expect(troubles).toEqual([]);
-});
+}, 30_000); // three rounds of "wait until the folder is quiet", and macOS's FSEvents tell late
 
 test("watch: Tandem's own writes in .tandem are not news", async () => {
   const { dir, store } = await followed("watch-own", { "a.tex": "a" });

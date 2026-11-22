@@ -6,8 +6,9 @@ import { Core, type Job } from "../src/core.ts";
 
 export const running: Core[] = [];
 
-export function stopAll() {
-  for (const c of running.splice(0)) c.stop();
+/** Stop every Tandem a test started (its database closed, so its folders can be deleted on Windows). */
+export async function stopAll() {
+  await Promise.all(running.splice(0).map((c) => c.stop()));
 }
 
 /** A Tandem with one folder (its id: `fid`), holding `files`. */

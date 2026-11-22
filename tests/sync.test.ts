@@ -247,50 +247,59 @@ test("sync: when the other copy goes away, the sync stops instead of failing eve
   expect(r.outcomes.map((o) => o.result)).toEqual(["failed", "stopped", "stopped"]);
 });
 
-test("sync: a folder or file that can't be read is unknown, not deleted: both sides are left alone", async () => {
-  const A = scratch("unread-a");
-  const B = scratch("unread-b");
-  put(A, { "ch.tex": "v1", "private/notes.md": "n", "private/more.md": "m", "locked.docx": "doc" });
-  const base = {};
-  await sync(A, B, base);
-  const { chmodSync } = await import("node:fs");
-  chmodSync(join(A, "private"), 0o000); // the folder can't be opened
-  chmodSync(join(A, "locked.docx"), 0o000); // the file can't be read (as when Word holds it)
-  put(B, { "private/notes.md": "edited on B" });
-  try {
-    const r = await sync(A, B, base);
-    expect(r.actions).toEqual([
-      { kind: "unread", path: "locked.docx" },
-      { kind: "unread", path: "private/more.md" },
-      { kind: "unread", path: "private/notes.md" },
-    ]);
-    expect(new Set(Object.values(results(r)))).toEqual(new Set(["unread"]));
-    expect(tree(B)).toEqual({
-      "ch.tex": "v1",
-      "private/notes.md": "edited on B",
-      "private/more.md": "m",
-      "locked.docx": "doc",
-    });
-    expect(tree(B, true)[".tandem/old"]).toBeUndefined();
-  } finally {
-    chmodSync(join(A, "private"), 0o755);
-    chmodSync(join(A, "locked.docx"), 0o644);
-  }
-  // readable again: the edit made meanwhile arrives
-  expect(results(await sync(A, B, base))).toEqual({ "private/notes.md": "received" });
+// made unreadable with Unix permissions, which Windows doesn't have (a file held open by Word is not tested)
+test.skipIf(process.platform === "win32")(
+  "sync: a folder or file that can't be read is unknown, not deleted: both sides are left alone",
+  async () => {
+    const A = scratch("unread-a");
+    const B = scratch("unread-b");
+    put(A, { "ch.tex": "v1", "private/notes.md": "n", "private/more.md": "m", "locked.docx": "doc" });
+    const base = {};
+    await sync(A, B, base);
+    const { chmodSync } = await import("node:fs");
+    chmodSync(join(A, "private"), 0o000); // the folder can't be opened
+    chmodSync(join(A, "locked.docx"), 0o000); // the file can't be read (as when Word holds it)
+    put(B, { "private/notes.md": "edited on B" });
+    try {
+      const r = await sync(A, B, base);
+      expect(r.actions).toEqual([
+        { kind: "unread", path: "locked.docx" },
+        { kind: "unread", path: "private/more.md" },
+        { kind: "unread", path: "private/notes.md" },
+      ]);
+      expect(new Set(Object.values(results(r)))).toEqual(new Set(["unread"]));
+      expect(tree(B)).toEqual({
+        "ch.tex": "v1",
+        "private/notes.md": "edited on B",
+        "private/more.md": "m",
+        "locked.docx": "doc",
+      });
+      expect(tree(B, true)[".tandem/old"]).toBeUndefined();
+    } finally {
+      chmodSync(join(A, "private"), 0o755);
+      chmodSync(join(A, "locked.docx"), 0o644);
+    }
+    // readable again: the edit made meanwhile arrives
+    expect(results(await sync(A, B, base))).toEqual({ "private/notes.md": "received" });
 
-  // the folder lists its files but none can be looked at (permissions changed by a careless command)
-  chmodSync(A, 0o644);
-  try {
-    const scan = await new LocalStore(A).scan(DEFAULT_IGNORE);
-    expect(scan.files).toEqual({});
-    expect(scan.unread.sort()).toEqual(["ch.tex", "locked.docx", "private/"]);
-    const actions = plan(scan.files, (await new LocalStore(B).scan(DEFAULT_IGNORE)).files, base, scan.unread);
-    expect(new Set(actions.map((x) => x.kind))).toEqual(new Set(["unread"])); // nothing deleted on B
-  } finally {
-    chmodSync(A, 0o755);
-  }
-});
+    // the folder lists its files but none can be looked at (permissions changed by a careless command)
+    chmodSync(A, 0o644);
+    try {
+      const scan = await new LocalStore(A).scan(DEFAULT_IGNORE);
+      expect(scan.files).toEqual({});
+      expect(scan.unread.sort()).toEqual(["ch.tex", "locked.docx", "private/"]);
+      const actions = plan(
+        scan.files,
+        (await new LocalStore(B).scan(DEFAULT_IGNORE)).files,
+        base,
+        scan.unread,
+      );
+      expect(new Set(actions.map((x) => x.kind))).toEqual(new Set(["unread"])); // nothing deleted on B
+    } finally {
+      chmodSync(A, 0o755);
+    }
+  },
+);
 
 test("store: nothing can be written or read outside the folder", async () => {
   const dir = scratch("jail");
