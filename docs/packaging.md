@@ -58,7 +58,8 @@ Fedora the links were missing anyway; built on Ubuntu, as in CI, there were 13.)
 - Linux: the AppImage, .rpm and .deb are built on Fedora and on Ubuntu (CI). The AppImage is started and
   checks for updates. The .rpm built without the links has not yet been installed next to another Electron
   app: the first one released (CI-built, with the links) failed that way.
-- Windows and macOS: built only by CI, never started. In the 0.3.0 run their jobs stopped at the tests, before
-  packaging: on Windows the tests can't delete the scratch folders of a Tandem still open (`EPERM`), and on
-  macOS one watcher test timed out. Neither is in the 0.3.0 release.
+- Windows and macOS: the tests pass there on every push (Check runs on Linux, Windows and macOS). Their
+  packages are built only by the release workflow and have never been started. The 0.3.0 run stopped at the
+  tests on both (since fixed: a stopped Tandem now closes its database, which Windows needs to delete it), so
+  0.3.0 has no Windows or macOS packages; the next tagged version will.
 - No package is signed.
