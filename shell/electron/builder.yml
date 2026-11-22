@@ -41,6 +41,9 @@ deb:
   artifactName: tandem_${version}_${arch}.deb
 rpm:
   artifactName: tandem-${version}.${arch}.rpm
+  # no /usr/lib/.build-id links: every Electron app ships the same binaries, so two of them installed with
+  # dnf conflict ("file /usr/lib/.build-id/… conflicts with file from package …")
+  fpm: ["--rpm-rpmbuild-define", "_build_id_links none"]
 
 win:
   target: nsis

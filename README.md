@@ -66,8 +66,7 @@ vp run dev
 - `vp run appimage` builds the Linux AppImage, `vp run install-app` also installs it for the current user.
 - `vp run dist` builds every package of the current system into `dist/packages/`.
 
-Only the Linux AppImage has been run. The Windows and macOS packages are configured and built by
-`.github/workflows/release.yml`, and nobody has tried them yet.
+Building packages, releasing, updates, and what has been tried: [docs/packaging.md](docs/packaging.md).
 
 ```
 src/              the sync itself: no Electron, tested (plan, apply, store, peer, core…)
@@ -76,5 +75,6 @@ shell/electron/   all the Electron code: window, menus, updates, packaging
 tools/            scripts: dev runner, install, translations
 tests/            vp test
 locales/app/      translations (.po), see docs/translating.md
-docs/             design.md (how the sync decides, the status), network.md (pairing, encryption, protocol)
+docs/             design.md (how the sync decides, the status), network.md (pairing, encryption, protocol),
+                  packaging.md (packages, releases, updates)
 ```
