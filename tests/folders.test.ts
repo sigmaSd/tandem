@@ -1,6 +1,6 @@
 import { put, scratch, tree } from "./_env.ts";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { afterEach, expect, test } from "vite-plus/test";
 import { Core, type DeviceCopy } from "../src/core.ts";
 import { Db } from "../src/db.ts";
@@ -249,7 +249,7 @@ test("folders: Tandem 0.2.0's one folder and its pairs carry over, and the next 
   }
   a2.config.devices[0].address = `127.0.0.1:${b2.port}`;
   b2.config.devices[0].address = `127.0.0.1:${a2.port}`;
-  expect(a2.config.folders.map((f) => f.path)).toEqual([a.folder]);
+  expect(a2.config.folders.map((f) => f.path)).toEqual([resolve(a.folder)]);
   expect(a2.config.devices.map((d) => d.name)).toEqual(["Laptop"]);
   expect((a2.config.folders[0].copies[0] as DeviceCopy).remote).toBe("legacy");
 
