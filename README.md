@@ -6,6 +6,8 @@ Made for people who work in the same folder from two computers and are tired of 
 by hand. Tandem shows every change before it makes it, asks when both sides changed the same
 file, and never overwrites or deletes anything without keeping a copy.
 
+![Each folder with its copies and what a sync would do](docs/screenshots/home.png)
+
 ## How it works
 
 1. **Choose the folder** on each computer (on the second one an empty folder is fine).
@@ -25,6 +27,15 @@ file, and never overwrites or deletes anything without keeping a copy.
    names and places, and the other computer reaches only the folders shared with it.
 
 Several copies are fine: three computers, four, and so on. Each is synced on its own.
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Another computer offers a folder](docs/screenshots/offer.png) | ![The review before a sync, conflicts first](docs/screenshots/review.png) |
+| A folder offered by another computer: choose where it goes here. | Every change is shown before it is made, conflicts first. |
+| ![The two versions of a file side by side](docs/screenshots/compare.png) | |
+| A conflict compared side by side, before choosing. | |
 
 ## What it does not do (yet)
 
