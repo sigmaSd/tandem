@@ -24,6 +24,9 @@ async function followed(name: string, files: Record<string, string>) {
   });
   expect(await watcher.start()).toBe(true);
   stops.push(() => watcher.stop());
+  // macOS (FSEvents) reports changes only from a moment after the watch begins. Tandem scans after starting
+  // its watcher, so a change at that moment is found by the scan; this test scans first, so it waits.
+  if (process.platform === "darwin") await new Promise((r) => setTimeout(r, 1500));
   return { dir, store, troubles };
 }
 
