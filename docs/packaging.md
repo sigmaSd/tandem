@@ -59,7 +59,8 @@ Fedora the links were missing anyway; built on Ubuntu, as in CI, there were 13.)
   checks for updates. The .rpm built without the links has not yet been installed next to another Electron
   app: the first one released (CI-built, with the links) failed that way.
 - Windows and macOS: the tests pass there on every push (Check runs on Linux, Windows and macOS). Their
-  packages are built only by the release workflow and have never been started. The 0.3.0 run stopped at the
-  tests on both (since fixed: a stopped Tandem now closes its database, which Windows needs to delete it), so
-  0.3.0 has no Windows or macOS packages; the next tagged version will.
+  packages are built only by the release workflow, from 0.3.1 on (`setup.exe`; a .dmg and a .zip each for
+  Intel and Apple Silicon), and have never been started. On macOS one watcher test is timing-sensitive: a
+  failed job can be run again (`gh run rerun <id> --failed`), and the release is published only once every
+  system's job has passed.
 - No package is signed.
