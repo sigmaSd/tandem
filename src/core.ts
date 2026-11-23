@@ -298,7 +298,20 @@ async function writeJson(path: string, value: unknown, mode?: number) {
   } finally {
     await fh.close();
   }
-  await rename(tmp, path);
+  // Windows refuses a rename onto a file that is being replaced or is held a moment (antivirus, the indexer):
+  // tried again a few times before giving up
+  for (let i = 0; ; i++) {
+    try {
+      return await rename(tmp, path);
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (i >= 5 || !["EPERM", "EACCES", "EBUSY"].includes(code ?? "")) {
+        await rm(tmp, { force: true }).catch(() => {});
+        throw e;
+      }
+      await new Promise((r) => setTimeout(r, 50 * (i + 1)));
+    }
+  }
 }
 
 /** Is `inner` the same folder as `outer`, or inside it? */
@@ -377,6 +390,8 @@ export class Core {
   #lastEmit = 0;
   #emitTimer?: ReturnType<typeof setTimeout>;
   #stopped = false;
+  /** The settings write under way (#save). */
+  #saving: Promise<void> = Promise.resolve();
   /** Resolves once stopped and the database closed. */
   #closed?: Promise<void>;
   /** The comparison or the sync running now. */
@@ -565,6 +580,7 @@ export class Core {
     const underway = Promise.allSettled([
       this.#running,
       this.#polling,
+      this.#saving,
       ...[...this.#folders.values()].map((s) => s.store.idle()),
     ]);
     this.#closed = Promise.race([underway, new Promise((r) => setTimeout(r, 5000))]).then(() =>
@@ -604,8 +620,11 @@ export class Core {
     for (const fn of this.#listeners) fn();
   }
 
-  async #save() {
-    await writeJson(join(this.stateDir, "config.json"), this.config, 0o600);
+  /** Write the settings. One write at a time: two renames onto the same file at once fail on Windows. */
+  #save(): Promise<void> {
+    const run = this.#saving.then(() => writeJson(join(this.stateDir, "config.json"), this.config, 0o600));
+    this.#saving = run.catch(() => {});
+    return run;
   }
 
   applyLanguage() {
