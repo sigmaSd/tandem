@@ -1,6 +1,6 @@
 {
   "name": "tandem",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "description": "Keep one folder the same on several computers, over the local network or a USB drive, with nothing in the cloud",
   "homepage": "https://tandem.invalid",
