@@ -701,4 +701,39 @@ progress::-webkit-progress-value {
   .tile {
     flex-wrap: wrap;
   }
+  /* a folder's name and path get the whole row next to its icon; its buttons go to the next one */
+  .folder-block > .tile > .grow {
+    flex-basis: calc(100% - 40px);
+  }
+  .folder-block > .tile > .grow + button {
+    margin-left: auto;
+  }
+}
+
+/* the pairing code as a QR code (app/ui/qr.ts), and the phone's camera reading one */
+.qr {
+  display: block;
+  width: 12em;
+  height: 12em;
+  margin: 0.75em 0;
+  background: #fff;
+  image-rendering: pixelated;
+}
+.scanner {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1em;
+  padding: 1em;
+  background: #000;
+  color: #fff;
+}
+.scanner video {
+  width: 100%;
+  max-height: 70%;
+  object-fit: cover;
 }

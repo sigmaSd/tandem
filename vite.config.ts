@@ -44,7 +44,8 @@ export default defineConfig({
     include: ["tests/*.test.ts"],
   },
   pack: {
-    entry: { electron: "shell/electron/main.ts" },
+    // android: run by nodeapk's shell on the phone (shell/android/main.ts)
+    entry: { electron: "shell/electron/main.ts", android: "shell/android/main.ts" },
     outDir: "dist/app",
     format: "esm",
     platform: "node",

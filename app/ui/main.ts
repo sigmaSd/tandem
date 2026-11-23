@@ -16,6 +16,8 @@ import { stampTime } from "../../src/names.ts";
 import type { Translations } from "../../src/po.ts";
 import type { OldVersion } from "../../src/store.ts";
 import { bytes, type Key, ltr, num, setUiLang, t, when } from "./i18n.ts";
+import { pairLink, parsePairLink } from "../../src/pairlink.ts";
+import { qrCode, scanQr } from "./qr.ts";
 
 type State = ReturnType<Core["state"]>;
 type FolderView = State["folders"][number];
@@ -379,6 +381,8 @@ function viaNetwork(f: FolderView): Kid[] {
                 { class: "sub gap selectable" },
                 t("codeAddress", { address: state.addresses.join(", ") }),
               ),
+            state.addresses.length > 0 && pairingQr(pairLink(state.pairing.code, state.addresses)),
+            state.addresses.length > 0 && h("p", { class: "sub" }, t("qrHelp")),
             h(
               "div",
               { class: "row right gap" },
@@ -415,9 +419,49 @@ function viaNetwork(f: FolderView): Kid[] {
     form.busy = false;
     draw(true);
   };
+  // a phone: read the other computer's QR code, then try its addresses in turn (the first that answers pairs)
+  const scan = async () => {
+    form.error = "";
+    let text: string | null;
+    try {
+      text = await scanQr(t("scanHelp"), t("cancel"));
+    } catch (e) {
+      form.error = t("scanNoCamera", { error: (e as Error).message });
+      draw();
+      return;
+    }
+    if (text === null) return;
+    const link = parsePairLink(text);
+    if (!link) {
+      form.error = t("scanNotTandem");
+      draw();
+      return;
+    }
+    form.code = link.code;
+    form.busy = true;
+    draw();
+    for (const address of link.addresses) {
+      try {
+        await call("pair", { address, code: link.code, folder: f.id });
+        form.code = "";
+        form.error = "";
+        break;
+      } catch (e) {
+        form.error = (e as Error).message;
+      }
+    }
+    form.busy = false;
+    draw(true);
+  };
   return [
     ...known,
     tabs,
+    state.phone &&
+      h(
+        "div",
+        { class: "gap" },
+        h("button", { class: "go", onclick: () => void scan() }, form.busy ? t("pairing") : t("scanCode")),
+      ),
     h(
       "label",
       { class: "field" },
@@ -477,6 +521,13 @@ function viaNetwork(f: FolderView): Kid[] {
   ];
 }
 
+/** The pairing QR code, kept across redraws while its text is the same (it is drawn asynchronously). */
+let shownQr: { text: string; el: HTMLElement } | null = null;
+function pairingQr(text: string): HTMLElement {
+  if (shownQr?.text !== text) shownQr = { text, el: qrCode(text) };
+  return shownQr.el;
+}
+
 function home(): Kid[] {
   return [
     offersCard(),
@@ -519,7 +570,7 @@ function folderCard(f: FolderView): HTMLElement {
         h("div", { class: "name" }, f.name),
         h("div", { class: "sub mono" }, ltr(f.path)),
       ),
-      h("button", { onclick: () => act("open-folder", { folder: f.id }) }, t("openFolder")),
+      !state.phone && h("button", { onclick: () => act("open-folder", { folder: f.id }) }, t("openFolder")),
       small("history", "oldVersions", () => openOld(f.id)),
       small("gear", "folderSettings", () => openFolderSettings(f.id)),
     ),
@@ -1038,7 +1089,9 @@ function done(job: Extract<Job, { phase: "done" }>): Kid[] {
         { class: "row gap wrap", style: "justify-content: center" },
         h("button", { class: "go", onclick: () => act("close") }, t("done")),
         !s.inSync && h("button", { onclick: () => act("compare", { id: job.copyId }) }, t("compareAgain")),
-        folder && h("button", { onclick: () => act("open-folder", { folder: folder.id }) }, t("openFolder")),
+        folder &&
+          !state.phone &&
+          h("button", { onclick: () => act("open-folder", { folder: folder.id }) }, t("openFolder")),
         folder && s.kept > 0 && h("button", { onclick: () => openOld(folder.id) }, t("oldVersions")),
       ),
     ),
@@ -1244,14 +1297,15 @@ function oldView(): Kid[] {
                 h("div", { class: "mono" }, ltr(o.path)),
                 h("div", { class: "sub" }, bytes(o.size)),
               ),
-              h(
-                "button",
-                {
-                  class: "small",
-                  onclick: () => act("open-old", { folder, stamp: o.stamp, path: o.path }),
-                },
-                t("open"),
-              ),
+              !state.phone &&
+                h(
+                  "button",
+                  {
+                    class: "small",
+                    onclick: () => act("open-old", { folder, stamp: o.stamp, path: o.path }),
+                  },
+                  t("open"),
+                ),
               h(
                 "button",
                 {

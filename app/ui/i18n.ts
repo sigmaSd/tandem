@@ -39,6 +39,11 @@ export const UI_SOURCE = {
   codeHelp:
     "In Tandem on the other computer, choose Add a copy, Another computer, Enter the other computer's code, and type this code. It works for 10 minutes, once.",
   codeAddress: "If the other computer doesn't find this one, give it this address: {address}",
+  qrHelp: "On a phone, choose Scan the code instead of typing it.",
+  scanCode: "Scan the code",
+  scanHelp: "Point the camera at the code on the other computer's screen.",
+  scanNotTandem: "That isn't a Tandem code.",
+  scanNoCamera: "The camera can't be used: {error}",
   codeLabel: "Code shown on the other computer",
   computerLabel: "Computer",
   noneShowingCode: "No computer is showing a code on this network yet.",

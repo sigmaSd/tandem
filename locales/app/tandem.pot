@@ -235,6 +235,26 @@ msgctxt "codeAddress"
 msgid "If the other computer doesn't find this one, give it this address: {address}"
 msgstr ""
 
+msgctxt "qrHelp"
+msgid "On a phone, choose Scan the code instead of typing it."
+msgstr ""
+
+msgctxt "scanCode"
+msgid "Scan the code"
+msgstr ""
+
+msgctxt "scanHelp"
+msgid "Point the camera at the code on the other computer's screen."
+msgstr ""
+
+msgctxt "scanNotTandem"
+msgid "That isn't a Tandem code."
+msgstr ""
+
+msgctxt "scanNoCamera"
+msgid "The camera can't be used: {error}"
+msgstr ""
+
 msgctxt "codeLabel"
 msgid "Code shown on the other computer"
 msgstr ""

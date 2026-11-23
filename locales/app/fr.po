@@ -235,6 +235,26 @@ msgctxt "codeAddress"
 msgid "If the other computer doesn't find this one, give it this address: {address}"
 msgstr "Si l'autre ordinateur ne trouve pas celui-ci, donnez-lui cette adresse : {address}"
 
+msgctxt "qrHelp"
+msgid "On a phone, choose Scan the code instead of typing it."
+msgstr "Sur un téléphone, choisissez Scanner le code au lieu de le taper."
+
+msgctxt "scanCode"
+msgid "Scan the code"
+msgstr "Scanner le code"
+
+msgctxt "scanHelp"
+msgid "Point the camera at the code on the other computer's screen."
+msgstr "Visez avec la caméra le code affiché sur l'écran de l'autre ordinateur."
+
+msgctxt "scanNotTandem"
+msgid "That isn't a Tandem code."
+msgstr "Ce n'est pas un code Tandem."
+
+msgctxt "scanNoCamera"
+msgid "The camera can't be used: {error}"
+msgstr "La caméra n'est pas utilisable : {error}"
+
 msgctxt "codeLabel"
 msgid "Code shown on the other computer"
 msgstr "Code affiché sur l'autre ordinateur"

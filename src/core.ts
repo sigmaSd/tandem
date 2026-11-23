@@ -1695,6 +1695,9 @@ export class Core {
       update: this.update,
       updateOut: this.updateOut,
       device: { name: c.device.name },
+      // on a phone (Tandem for Android, through nodeapk): pairing scans the code's QR with the camera, and
+      // there is no opening a file in another app
+      phone: process.platform === "android",
       addresses: localAddresses().map((a) => (this.#peer.port === PEER_PORT ? a : `${a}:${this.#peer.port}`)),
       folders: c.folders.map((f) => {
         const side = this.#folders.get(f.id);
