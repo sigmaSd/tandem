@@ -25,7 +25,9 @@ if (!data) {
   process.exit(1);
 }
 
-const core = new Core(join(data, "state"));
+// the phone's name (from its settings, through nodeapk): os.hostname() is "localhost" on every phone
+const deviceName = process.env.NODEAPK_DEVICE_NAME?.trim() || undefined;
+const core = new Core(join(data, "state"), { deviceName });
 core.appVersion = process.env.NODEAPK_VERSION ?? "android";
 // LANG is fr_FR.UTF-8 style; Tandem wants BCP 47 (fr-FR)
 const lang = process.env.LANG?.split(".")[0]?.replace("_", "-");
@@ -36,6 +38,9 @@ core.shell = {
   open: () => Promise.reject(new Error("opening files isn't available on Android yet")),
 };
 await core.init();
+// a phone set up before the name came through is called "localhost", which nobody chose: rename it (the
+// paired computers take the new name from its next answer)
+if (deviceName && core.config.device.name === "localhost") await core.setSettings({ name: deviceName });
 
 const served = await serve(core, join(APP_DIR, "app", "ui", "dist"));
 console.log(`nodeapk: ${served.origin}/?k=${served.secret}`);

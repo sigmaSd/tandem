@@ -477,3 +477,15 @@ test("core: the records of Tandem 0.1.0 move into the database, so the next sync
   expect(summary).toMatchObject({ removed: 1, inSync: true }); // a deletion, not a file brought back
   expect(tree(b.folder)).toEqual({ "kept.tex": "k" });
 });
+
+test("core: a new device takes the name it is given (a phone's host name is just localhost), and keeps its own after", async () => {
+  const dir = scratch("device-name");
+  const core = new Core(dir, { discovery: false, bind: "127.0.0.1", port: 0, deviceName: "Pixel 9" });
+  await core.init();
+  expect(core.config.device.name).toBe("Pixel 9");
+  await core.stop();
+  const again = new Core(dir, { discovery: false, bind: "127.0.0.1", port: 0, deviceName: "Other" });
+  await again.init();
+  expect(again.config.device.name).toBe("Pixel 9");
+  await again.stop();
+});

@@ -259,6 +259,8 @@ export interface CoreOptions {
   pollSeconds?: number;
   /** Watch folders for changes (off: as on a system where watching fails, for tests). */
   watch?: boolean;
+  /** This computer's name when it has none yet (default: the host name; a phone's is "localhost"). */
+  deviceName?: string;
 }
 
 const noShell: ShellHooks = {
@@ -438,7 +440,10 @@ export class Core {
     await mkdir(this.stateDir, { recursive: true });
     const saved = await readJson<Partial<Config> & ConfigV2>(join(this.stateDir, "config.json"));
     this.config = {
-      device: saved?.device ?? { id: hex(16), name: hostname().split(".")[0].slice(0, 40) || "Computer" },
+      device: saved?.device ?? {
+        id: hex(16),
+        name: (this.#options.deviceName ?? hostname().split(".")[0]).slice(0, 40) || "Computer",
+      },
       port: saved?.port ?? this.#options.port ?? PEER_PORT,
       devices: saved?.devices ?? [],
       folders: saved?.folders ?? [],

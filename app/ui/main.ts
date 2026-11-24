@@ -600,6 +600,10 @@ function folderCard(f: FolderView): HTMLElement {
 }
 
 function copyTile(c: CopyView): HTMLElement {
+  // the other side doesn't know this computer any more (it was reset or reinstalled, or forgot this one): this
+  // pairing can never sync again, so its row offers to forget it rather than a Sync that can't work
+  const dead = c.status?.there.known === false && c.status.there.why === "refused";
+  if (dead && form.removing === c.deviceId) return forgetConfirm(c.deviceId, c.name);
   return h(
     "div",
     { class: "tile" },
@@ -619,8 +623,23 @@ function copyTile(c: CopyView): HTMLElement {
             ),
           ]),
     ),
-    !c.waiting &&
-      h("button", { class: c.available ? "go" : "", onclick: () => act("compare", { id: c.id }) }, t("sync")),
+    dead
+      ? h(
+          "button",
+          {
+            onclick: () => {
+              form.removing = c.deviceId;
+              draw();
+            },
+          },
+          t("forget"),
+        )
+      : !c.waiting &&
+          h(
+            "button",
+            { class: c.available ? "go" : "", onclick: () => act("compare", { id: c.id }) },
+            t("sync"),
+          ),
   );
 }
 
@@ -1452,40 +1471,43 @@ function settingsView(): Kid[] {
   ];
 }
 
+/** Forgetting a paired computer, the second click: in the settings, or on a pairing that can't work any more. */
+function forgetConfirm(deviceId: string, name: string): HTMLElement {
+  return h(
+    "div",
+    { class: "tile" },
+    icon("desktop", "big"),
+    h("div", { class: "grow sub" }, t("forgetConfirm", { name })),
+    h(
+      "button",
+      {
+        class: "small",
+        onclick: () => {
+          form.removing = "";
+          draw();
+        },
+      },
+      t("cancel"),
+    ),
+    h(
+      "button",
+      {
+        class: "small danger",
+        onclick: async () => {
+          form.removing = "";
+          await act("device-forget", { device: deviceId });
+          draw();
+        },
+      },
+      t("forget"),
+    ),
+  );
+}
+
 /** A paired computer in the settings: forgotten after a second click. */
 function deviceRow(d: State["devices"][number]) {
   const ic = icon("desktop", "big");
-  if (form.removing === d.id) {
-    return h(
-      "div",
-      { class: "tile" },
-      ic,
-      h("div", { class: "grow sub" }, t("forgetConfirm", { name: d.name })),
-      h(
-        "button",
-        {
-          class: "small",
-          onclick: () => {
-            form.removing = "";
-            draw();
-          },
-        },
-        t("cancel"),
-      ),
-      h(
-        "button",
-        {
-          class: "small danger",
-          onclick: async () => {
-            form.removing = "";
-            await act("device-forget", { device: d.id });
-            draw();
-          },
-        },
-        t("forget"),
-      ),
-    );
-  }
+  if (form.removing === d.id) return forgetConfirm(d.id, d.name);
   const shared = state.folders.filter((f) => f.copies.some((c) => c.deviceId === d.id)).map((f) => f.name);
   return h(
     "div",
