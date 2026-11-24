@@ -1,0 +1,3 @@
+• No sync starts on a folder another device is syncing with this one: its Sync button waits, and the notice says how far that sync is ("12 of 40 files").
+• On the phone, comparing two versions no longer offers to open them in another app, which it can't do yet.
+• The app is built reproducibly: F-Droid's build from source is byte for byte the APK published on GitHub.
