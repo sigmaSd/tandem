@@ -25,10 +25,10 @@ export default defineConfig({
 
   fmt: {
     printWidth: 110,
-    ignorePatterns: ["app/ui/dist/**", "dist/**", "pnpm-lock.yaml", "*.md", "locales/**"],
+    ignorePatterns: ["app/ui/dist/**", "dist/**", "pnpm-lock.yaml", "*.md", "locales/**", "vendor/**"],
   },
   lint: {
-    ignorePatterns: ["app/ui/dist/**", "dist/**"],
+    ignorePatterns: ["app/ui/dist/**", "dist/**", "vendor/**"],
     options: { typeAware: true, typeCheck: true },
     rules: {
       // deliberate: the window starts work it doesn't wait for (each call catches and shows its own errors)

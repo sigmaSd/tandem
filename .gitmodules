@@ -1,0 +1,6 @@
+[submodule "vendor/node-android"]
+	path = vendor/node-android
+	url = https://github.com/sigmaSd/node-android.git
+[submodule "vendor/nodeapk"]
+	path = vendor/nodeapk
+	url = https://github.com/sigmaSd/nodeapk.git

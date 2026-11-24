@@ -1,0 +1,20 @@
+Keep a folder the same on your phone and your computers, over your own Wi-Fi. Nothing goes to the cloud: no account, no server, the files go straight from one device to the other, encrypted.
+
+Tandem shows every change before it makes it, and never overwrites or deletes a file without keeping a copy.
+
+How it works
+• Choose a folder on the phone, and its copy on a computer (an empty folder is fine).
+• Pair them once: scan the QR code the computer shows.
+• Sync: Tandem compares the two copies and lists what it will do: files to send, to receive, deleted on the other side, and files changed on both sides, with three answers each: this device's version, the other's, or both. Text files can be compared side by side first.
+• Between syncs, the home screen says what a sync would do ("2 to send · 1 to receive"), or why it can't tell. It never says "in sync" without seeing both sides.
+• Every replaced or deleted file is kept for 90 days in the folder's old versions, and can be put back.
+• Several folders, several devices: each copy is synced on its own.
+
+Good to know
+• The other side is the Tandem desktop app (Linux, Windows, macOS), free from the project's releases. Both must be on the same network, with Tandem open, to sync.
+• It does not sync in the background: you start each sync and see it. On the phone it works while the app is open.
+• To reach your folders, the app asks for "All files access".
+• It can't open files in other apps yet.
+• Empty folders, links and file permissions are not synced.
+
+Tandem is free software (GPL-3.0-or-later). The Android app runs Tandem's core with Node.js on the phone.

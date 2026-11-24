@@ -48,7 +48,8 @@
       "multicast",
       "all-files",
       "camera"
-    ]
+    ],
+    "versionCode": 306
   },
   "productName": "Tandem"
 }

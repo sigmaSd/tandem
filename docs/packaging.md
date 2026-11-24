@@ -18,18 +18,25 @@ installed apps read to find a new version). `vp run appimage` builds the AppImag
 also installs it for the current user.
 
 The Android APK is built by [nodeapk](https://github.com/sigmaSd/nodeapk) from `shell/android/main.ts` (the
-`nodeapk` block in `package.json`):
+`nodeapk` block in `package.json`), from its sources in `vendor/nodeapk` (a git submodule:
+`git submodule update --init` once):
 
 ```bash
-vp build && vp pack && npx @sigmasd/nodeapk build . --install
+vp build && vp pack && node vendor/nodeapk/src/cli.ts build . --install
 ```
+
+The release and F-Droid build the same APK, byte for byte before signing: same nodeapk sources (the
+submodule), same Node. The release takes Node from [node-android](https://github.com/sigmaSd/node-android)'s
+release; F-Droid builds that release from source with `vendor/node-android` (its `reproduce` workflow checks a
+release rebuilds bit for bit). Updating either means moving its submodule, then releasing.
 
 Built here it is signed with this machine's debug key: fine for trying it on a phone, but a phone that has
 the released APK refuses it (and the reverse). `vp run install-dev` makes the menu's Tandem run this checkout.
 
 ## Releasing
 
-1. Raise `version` in `package.json`, commit, push.
+1. Raise `version` in `package.json`, and `nodeapk.versionCode` with it (0.3.7 → 307: F-Droid reads it there;
+   `vp test` checks the two agree), commit, push.
 2. A tag `v<version>` (or `gh release create v<version>`) starts the release workflow: it builds Linux,
    Windows and macOS packages and attaches them, with the update files (`latest-linux.yml`, `latest.yml`,
    `latest-mac.yml`, `*.blockmap`), to that tag's release, and the Android APK
