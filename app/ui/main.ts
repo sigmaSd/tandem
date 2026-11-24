@@ -46,6 +46,28 @@ function h<K extends keyof HTMLElementTagNameMap>(
   return el;
 }
 
+/**
+ * A button on a screen redrawn many times a second (scanning, sending), acting as soon as it is pressed. A
+ * click needs the press and the release on the same element, and a redraw in between replaces the button,
+ * so clicks there were often lost. The keyboard (Enter, Space) still goes through click.
+ */
+function pressButton(label: string, onpress: () => void): HTMLButtonElement {
+  let pressed = false;
+  const go = () => {
+    if (pressed) return;
+    pressed = true;
+    onpress();
+  };
+  return h(
+    "button",
+    {
+      onpointerdown: (e: PointerEvent) => e.button === 0 && go(),
+      onclick: go,
+    },
+    label,
+  );
+}
+
 const ICONS = {
   right: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   left: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
@@ -718,7 +740,11 @@ function scanning(job: Extract<Job, { phase: "scanning" }>): Kid[] {
         { class: "sub" },
         tt ? t("readingThere", { name, done: num(td), total: num(tt) }) : t("readingThereBlind", { name }),
       ),
-      h("div", { class: "gap" }, h("button", { onclick: () => act("cancel") }, t("cancel"))),
+      h(
+        "div",
+        { class: "gap" },
+        pressButton(t("cancel"), () => void act("cancel")),
+      ),
     ),
   ];
 }
@@ -1036,17 +1062,11 @@ function applying(job: Extract<Job, { phase: "applying" }>): Kid[] {
         { class: "gap" },
         stopping
           ? h("span", { class: "sub" }, t("stopping"))
-          : h(
-              "button",
-              {
-                onclick: () => {
-                  stopping = true;
-                  void act("cancel");
-                  draw();
-                },
-              },
-              t("stop"),
-            ),
+          : pressButton(t("stop"), () => {
+              stopping = true;
+              void act("cancel");
+              draw();
+            }),
       ),
     ),
   ];
