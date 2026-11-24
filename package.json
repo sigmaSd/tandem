@@ -1,6 +1,6 @@
 {
   "name": "tandem",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "private": true,
   "description": "Keep one folder the same on several computers, over the local network or a USB drive, with nothing in the cloud",
   "homepage": "https://tandem.invalid",
@@ -49,7 +49,7 @@
       "all-files",
       "camera"
     ],
-    "versionCode": 306
+    "versionCode": 307
   },
   "productName": "Tandem"
 }
