@@ -1246,12 +1246,15 @@ function compareView(): Kid[] {
   const it = loadedItems().find((i) => i.path === c.path) ?? c.item;
   const name = state.job ? nameOf(state.job.copyId) : "";
   const d = c.data;
+  // a phone can't open a file in another app (yet)
   const opens = h(
     "div",
     { class: "row gap wrap" },
     it?.here &&
+      !state.phone &&
       h("button", { onclick: () => act("open-version", { path: c.path, side: "a" }) }, t("openMine")),
     it?.there &&
+      !state.phone &&
       h(
         "button",
         { onclick: () => act("open-version", { path: c.path, side: "b" }) },
