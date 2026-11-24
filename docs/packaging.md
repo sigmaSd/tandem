@@ -17,12 +17,25 @@ Everything lands in `dist/packages/`: the AppImage, the .rpm, the .deb, and `lat
 installed apps read to find a new version). `vp run appimage` builds the AppImage alone, `vp run install-app`
 also installs it for the current user.
 
+The Android APK is built by [nodeapk](https://github.com/sigmaSd/nodeapk) from `shell/android/main.ts` (the
+`nodeapk` block in `package.json`):
+
+```bash
+vp build && vp pack && npx @sigmasd/nodeapk build . --install
+```
+
+Built here it is signed with this machine's debug key: fine for trying it on a phone, but a phone that has
+the released APK refuses it (and the reverse). `vp run install-dev` makes the menu's Tandem run this checkout.
+
 ## Releasing
 
 1. Raise `version` in `package.json`, commit, push.
 2. A tag `v<version>` (or `gh release create v<version>`) starts the release workflow: it builds Linux,
    Windows and macOS packages and attaches them, with the update files (`latest-linux.yml`, `latest.yml`,
-   `latest-mac.yml`, `*.blockmap`), to that tag's release.
+   `latest-mac.yml`, `*.blockmap`), to that tag's release, and the Android APK
+   (`Tandem-<version>-android-arm64.apk`), signed with Tandem's release key: the `ANDROID_KEYSTORE_BASE64`
+   and `ANDROID_KEYSTORE_PASSWORD` secrets. The key itself is kept outside the repository; every APK must be
+   signed with it, or phones won't update.
 3. Or build the Linux packages here and attach them yourself:
    `gh release upload v<version> dist/packages/{*.AppImage,*.rpm,*.deb,latest-linux.yml} --clobber`.
    Always upload `latest-linux.yml` together with the packages it describes: it carries their sizes and
@@ -38,6 +51,7 @@ sigmaSd/tandem at launch and once a day.
   so it's left to the package manager. electron-builder writes `resources/package-type` into these packages,
   which is how the app knows what it was installed as.
 - A copy started from the checkout (`electron .`) never asks.
+- The Android app doesn't check: a newer APK from the releases page installs over the old one (same key).
 
 ## The .rpm and /usr/lib/.build-id
 
@@ -63,4 +77,6 @@ Fedora the links were missing anyway; built on Ubuntu, as in CI, there were 13.)
   Intel and Apple Silicon), and have never been started. On macOS one watcher test is timing-sensitive: a
   failed job can be run again (`gh run rerun <id> --failed`), and the release is published only once every
   system's job has passed.
-- No package is signed.
+- Android: the APK runs on an Android 16 phone (pairing by QR, a sync); 0.3.3 is the first with an APK in
+  the release.
+- No desktop package is signed. The APK is, with Tandem's release key.
