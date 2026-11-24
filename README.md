@@ -81,3 +81,12 @@ locales/app/      translations (.po), see docs/translating.md
 docs/             design.md (how the sync decides, the status), network.md (pairing, encryption, protocol),
                   packaging.md (packages, releases, updates)
 ```
+
+## License
+
+Tandem is free software under the [GNU General Public License, version 3](LICENSE) or (at your option) any later
+version: use it, study it, change it and share it, as long as what you share stays under the same license, with
+its source.
+
+The name "Tandem" and its icon are not covered by that license: a modified version shared with others goes under
+another name and icon.

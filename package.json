@@ -5,6 +5,7 @@
   "description": "Keep one folder the same on several computers, over the local network or a USB drive, with nothing in the cloud",
   "homepage": "https://tandem.invalid",
   "author": "Bedis Nbiba",
+  "license": "GPL-3.0-or-later",
   "type": "module",
   "main": "dist/app/electron.mjs",
   "scripts": {
