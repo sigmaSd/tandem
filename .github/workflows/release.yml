@@ -1,6 +1,6 @@
-# A v* tag: the installers for every system, attached to that tag's GitHub release. Not signed (see
-# shell/electron/builder.yml); macOS ad-hoc. The release is a draft while the builds upload, and published
-# only when all of them succeeded.
+# A v* tag: the installers for every system and the Android APK, attached to that tag's GitHub release.
+# Installers not signed (see shell/electron/builder.yml), macOS ad-hoc; the APK is (see the android job).
+# The release is a draft while the builds upload, and published only when all of them succeeded.
 # The update files (latest-linux.yml, latest.yml, latest-mac.yml, *.blockmap) go up with the packages: the
 # apps read them to update. The Windows and macOS packages it builds have never been started by anyone.
 name: Release
@@ -66,8 +66,44 @@ jobs:
           shopt -s nullglob
           gh release upload "$GITHUB_REF_NAME" dist/packages/*.{AppImage,deb,rpm,exe,dmg,zip,blockmap} dist/packages/latest*.yml --clobber
 
+  # The Android app (shell/android/main.ts), packed by nodeapk (https://github.com/sigmaSd/nodeapk) and signed
+  # with Tandem's release key, so that each APK installs over the previous one. The key and its password are
+  # the ANDROID_KEYSTORE_BASE64 and ANDROID_KEYSTORE_PASSWORD secrets; without them the job fails rather
+  # than ship an APK signed with a throwaway key (which phones would refuse to update over).
+  android:
+    needs: release
+    name: android
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vp test
+      - run: pnpm exec vp build
+      - run: pnpm exec vp pack
+      - name: APK
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          NODEAPK_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          [ -n "$KEYSTORE" ] && [ -n "$NODEAPK_KEYSTORE_PASSWORD" ] || { echo "the Android signing secrets are missing"; exit 1; }
+          echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/tandem.keystore"
+          v=$(node -p "require('./package.json').version")
+          npx --yes @sigmasd/nodeapk@0.1.3 build . --keystore "$RUNNER_TEMP/tandem.keystore" \
+            --out "dist/packages/Tandem-$v-android-arm64.apk"
+          rm "$RUNNER_TEMP/tandem.keystore"
+      - name: Attach the APK to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" dist/packages/*.apk --clobber
+
   publish:
-    needs: build
+    needs: [build, android]
     runs-on: ubuntu-24.04
     steps:
       - name: Publish the release, now that every system's packages are in it
