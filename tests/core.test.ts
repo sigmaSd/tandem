@@ -113,7 +113,9 @@ test("core: no sync starts on a folder another computer is syncing with this one
   a.core.job = { phase: "scanning", copyId: ids.onA, here: [0, 0], there: [0, 0] };
   b.core.compare(ids.onB);
   const refused = await reach(b.core, "error");
-  expect(refused.message).toBe("Office PC is already syncing this folder. Wait for it to end, then try again.");
+  expect(refused.message).toBe(
+    "Office PC is already syncing this folder. Wait for it to end, then try again.",
+  );
   expect(a.core.state().folders[0].guest).toBeNull();
   a.core.job = null;
   b.core.closeJob();
