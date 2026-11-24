@@ -94,7 +94,7 @@ jobs:
           [ -n "$KEYSTORE" ] && [ -n "$NODEAPK_KEYSTORE_PASSWORD" ] || { echo "the Android signing secrets are missing"; exit 1; }
           echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/tandem.keystore"
           v=$(node -p "require('./package.json').version")
-          npx --yes @sigmasd/nodeapk@0.1.3 build . --keystore "$RUNNER_TEMP/tandem.keystore" \
+          npx --yes @sigmasd/nodeapk@0.1.4 build . --keystore "$RUNNER_TEMP/tandem.keystore" \
             --out "dist/packages/Tandem-$v-android-arm64.apk"
           rm "$RUNNER_TEMP/tandem.keystore"
       - name: Attach the APK to the release
