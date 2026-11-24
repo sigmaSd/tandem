@@ -33,6 +33,7 @@ export const UI_SOURCE = {
   addCopy: "Add a copy",
   whereOther: "Pair with your other computer",
   viaNetworkSub: "Both computers on at the same time, Tandem open on both",
+  getTandem: "Tandem for the other device (Linux, Windows, macOS, Android):",
   showCode: "Show a code here",
   enterCode: "Enter the other computer's code",
   showCodeButton: "Show a code",

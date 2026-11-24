@@ -80,6 +80,9 @@ html,
 body {
   height: 100%;
 }
+a {
+  color: var(--accent);
+}
 body {
   margin: 0;
   display: flex;

@@ -335,8 +335,13 @@ function addCopy(f: FolderView): Kid[] {
     h("h1", null, first ? t("whereOther") : t("addCopyOf", { name: f.name })),
     h("p", { class: "lead" }, t("viaNetworkSub")),
     ...viaNetwork(f),
+    h("p", { class: "sub" }, t("getTandem"), " ", siteLink()),
   ];
 }
+
+/** The website: Tandem for every system. A link leaves the window (the desktop and phone shells open it outside). */
+const SITE = "https://sigmasd.github.io/tandem/";
+const siteLink = () => h("a", { href: SITE, target: "_blank", rel: "noopener" }, "sigmasd.github.io/tandem");
 
 function viaNetwork(f: FolderView): Kid[] {
   // computers paired already: shared with in one click, no code
@@ -1508,6 +1513,7 @@ function settingsView(): Kid[] {
 
     h("h2", null, t("aboutSection")),
     h("p", { class: "sub" }, t("aboutText", { v: state.version })),
+    h("p", { class: "sub" }, t("getTandem"), " ", siteLink()),
   ];
 }
 

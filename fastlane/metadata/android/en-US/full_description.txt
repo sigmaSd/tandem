@@ -11,7 +11,7 @@ How it works
 • Several folders, several devices: each copy is synced on its own.
 
 Good to know
-• The other side is the Tandem desktop app (Linux, Windows, macOS), free from the project's releases. Both must be on the same network, with Tandem open, to sync.
+• The other side is the Tandem desktop app (Linux, Windows, macOS), free at https://sigmasd.github.io/tandem/ Both must be on the same network, with Tandem open, to sync.
 • It does not sync in the background: you start each sync and see it. On the phone it works while the app is open.
 • To reach your folders, the app asks for "All files access".
 • It can't open files in other apps yet.

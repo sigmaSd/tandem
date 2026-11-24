@@ -2,6 +2,8 @@
 
 Keep folders the same on several computers, over your own network. Nothing goes to the cloud.
 
+**Download for Linux, Windows, macOS and Android: <https://sigmasd.github.io/tandem/>**
+
 Made for people who work in the same folder from two computers and are tired of copying the last version
 by hand. Tandem shows every change before it makes it, asks when both sides changed the same
 file, and never overwrites or deletes anything without keeping a copy.

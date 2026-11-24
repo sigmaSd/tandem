@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Privacy · Tandem</title>
+    <meta name="description" content="What Tandem sends, to whom, and what it keeps." />
+    <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="assets/icon.png" type="image/png" />
+    <link rel="stylesheet" href="assets/style.css" />
+  </head>
+  <body>
+    <main class="policy">
+      <nav>
+        <a class="brand" href="./"
+          ><img src="assets/icon.png" alt="" width="48" height="48" /><strong>Tandem</strong></a
+        >
+        <a href="./#download">Download</a>
+        <a href="https://github.com/sigmaSd/tandem">Source</a>
+      </nav>
+
+      <h1>Privacy</h1>
+      <p class="muted">Publisher: sigmasd · Last updated: 24 November 2026</p>
+
+      <p>
+        Tandem has no account, no server of ours, no advertising and no analytics. Your files go only to the
+        devices you paired, directly, over your own network.
+      </p>
+
+      <h2>Your files</h2>
+      <p>
+        During a sync, files are sent straight from one of your devices to the other, encrypted with a key the
+        two devices made when they were paired. Nothing passes through a server, ours or anyone's. Tandem only
+        reaches the folders you chose, and only a device you shared a folder with can ask for it.
+      </p>
+
+      <h2>What Tandem says on your network</h2>
+      <p>
+        While it is open, Tandem announces itself on the local network every few seconds, so your other
+        devices can find it without typing an address: this device's name, a random identifier, the port it
+        listens on, and whether it is showing a pairing code. Other devices on the same network can see that
+        announcement. It carries no file names, no files and no secret.
+      </p>
+
+      <h2>What it keeps on the device</h2>
+      <ul>
+        <li>Its settings: this device's name, the paired devices and their keys, the folders you chose.</li>
+        <li>
+          A list of each folder's files (names, sizes, dates, checksums), to tell what changed between syncs.
+        </li>
+        <li>
+          Old versions of replaced or deleted files, inside the folder (<code>.tandem/old/</code>), for 90
+          days by default.
+        </li>
+      </ul>
+      <p>
+        All of it stays on the device. Removing a folder from Tandem, or uninstalling it, leaves your files
+        where they are.
+      </p>
+
+      <h2>Updates</h2>
+      <p>
+        The desktop app checks GitHub for a new version when it starts and once a day, by downloading the
+        release list from github.com, which sees that request like any visit. The Android app doesn't check
+        for updates.
+      </p>
+
+      <h2>Permissions on Android</h2>
+      <p>
+        "All files access" lets Tandem read and write the folders you choose. The camera is only used to scan
+        a pairing QR code, on that screen. Local network access finds and reaches your other devices.
+      </p>
+
+      <h2>This website</h2>
+      <p>
+        This site is hosted on GitHub Pages. It has no analytics or advertising. To show the download buttons,
+        your browser asks GitHub's API for the latest release. GitHub may process ordinary request data under
+        its own privacy terms.
+      </p>
+
+      <h2>Contact</h2>
+      <p>
+        Questions and problems:
+        <a href="https://github.com/sigmaSd/tandem/issues">github.com/sigmaSd/tandem/issues</a>. Please don't
+        put private files or personal data in a public issue.
+      </p>
+
+      <footer><a href="./">Tandem</a> · free software, under the GPL 3.0 or later</footer>
+    </main>
+  </body>
+</html>

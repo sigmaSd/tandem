@@ -223,6 +223,10 @@ msgctxt "viaNetworkSub"
 msgid "Both computers on at the same time, Tandem open on both"
 msgstr ""
 
+msgctxt "getTandem"
+msgid "Tandem for the other device (Linux, Windows, macOS, Android):"
+msgstr ""
+
 msgctxt "showCode"
 msgid "Show a code here"
 msgstr ""

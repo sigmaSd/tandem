@@ -35,8 +35,11 @@ the released APK refuses it (and the reverse). `vp run install-dev` makes the me
 
 ## Releasing
 
-1. Raise `version` in `package.json`, and `nodeapk.versionCode` with it (0.3.7 → 307: F-Droid reads it there;
-   `vp test` checks the two agree), commit, push.
+1. Raise `version` in `package.json`, and `nodeapk.versionCode` with it (0.3.7 → 307: F-Droid reads it there).
+   Write what changed, for the people who use Tandem: `docs/releases/v<version>.md` (the release's notes on
+   GitHub, with screenshots in `docs/releases/images/` when a change can be seen, linked as `images/…`) and
+   `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (F-Droid's, plain text, 500 characters at
+   most). `vp test` checks the version code and that both exist. Commit, push.
 2. A tag `v<version>` (or `gh release create v<version>`) starts the release workflow: it builds Linux,
    Windows and macOS packages and attaches them, with the update files (`latest-linux.yml`, `latest.yml`,
    `latest-mac.yml`, `*.blockmap`), to that tag's release, and the Android APK
