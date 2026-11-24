@@ -53,12 +53,72 @@ test("core: the notice that another computer is syncing here shows while it work
   b.core.compare(ids.onB);
   await reach(b.core, "review");
   expect(a.core.state().guest).toBe("Laptop"); // the review is open over there
-  b.core.cancel(); // left without syncing: nothing says "done", so the notice goes by itself
+  b.core.cancel(); // left without syncing: it says so, and the notice goes at once
   told = 0;
-  await new Promise((r) => setTimeout(r, 4600));
+  await new Promise((r) => setTimeout(r, 500));
   expect(a.core.state().guest).toBeNull();
   expect(told).toBeGreaterThan(0); // and the window was told, so it redraws without it
-}, 10_000);
+});
+
+test("core: the computer synced with is told how far the sync is, and when it is left", async () => {
+  const a = await tandem("Office PC", { "thesis.tex": "text" });
+  const b = await tandem("Laptop");
+  await pair(a.core, b.core);
+  const onB = copies(b.core)[0];
+  if (onB.kind !== "device") throw new Error("not a device");
+  const remote = new RemoteStore(
+    new Link(
+      `127.0.0.1:${a.core.port}`,
+      { id: b.core.config.device.id, port: b.core.port },
+      onB.deviceId,
+      Buffer.from(b.core.config.devices[0].key, "base64"),
+    ),
+    new Db(":memory:").scope("peer"),
+    new Db(":memory:").scope("peerbase"),
+    () => ({ folder: String(onB.remote), from: b.fid }),
+  );
+  await remote.scan("");
+  expect(a.core.state()).toMatchObject({ guest: "Laptop", guestProgress: null }); // comparing: no count yet
+  remote.progress = [2, 5];
+  await remote.checkpoint();
+  expect(a.core.state().guestProgress).toEqual([2, 5]);
+  remote.progress = null;
+  await remote.checkpoint(); // a request that doesn't say keeps the last count
+  expect(a.core.state().guestProgress).toEqual([2, 5]);
+  await remote.scan(""); // the next comparison starts from nothing
+  expect(a.core.state().guestProgress).toBeNull();
+  await remote.left();
+  expect(a.core.state()).toMatchObject({ guest: null, guestProgress: null });
+  expect(a.core.state().folders[0].guest).toBeNull(); // and a sync can start there again
+});
+
+test("core: no sync starts on a folder another computer is syncing with this one, either way", async () => {
+  const a = await tandem("Office PC", { "x.tex": "x" });
+  const b = await tandem("Laptop");
+  const ids = await pair(a.core, b.core);
+
+  // the laptop compared: the office PC's folder is its guest's until it is done
+  b.core.compare(ids.onB);
+  await reach(b.core, "review");
+  expect(a.core.state().folders[0].guest).toBe("Laptop");
+  expect(() => a.core.compare(ids.onA)).toThrow("Laptop is syncing this folder with this computer");
+  expect(a.core.job).toBeNull();
+  b.core.start();
+  await reach(b.core, "done");
+  expect(a.core.state().folders[0].guest).toBeNull(); // it said it was done: free again
+  expect(await syncNow(a.core, ids.onA)).toMatchObject({ inSync: true });
+  a.core.closeJob();
+
+  // the office PC is comparing (held there for the test): the laptop is told, nothing is scanned for it
+  a.core.job = { phase: "scanning", copyId: ids.onA, here: [0, 0], there: [0, 0] };
+  b.core.compare(ids.onB);
+  const refused = await reach(b.core, "error");
+  expect(refused.message).toBe("Office PC is already syncing this folder. Wait for it to end, then try again.");
+  expect(a.core.state().folders[0].guest).toBeNull();
+  a.core.job = null;
+  b.core.closeJob();
+  expect(await syncNow(b.core, ids.onB)).toMatchObject({ inSync: true });
+});
 
 test("core: a conflict is shown, compared side by side, and settled by the answer", async () => {
   const a = await tandem("Office PC", { "ch2.tex": "Intro.\nWe prove X.\nEnd." });
@@ -284,11 +344,13 @@ test("core: a review left open while the other computer synced must be made agai
   a.core.compare(ids.onA);
   await reach(a.core, "review");
   put(b.folder, { "b.tex": "from b" });
+  // the laptop can sync once the office PC's comparison has stopped asking it things
+  while (b.core.state().folders[0].guest) await new Promise((r) => setTimeout(r, 150));
   await syncNow(b.core, ids.onB);
   a.core.start();
   expect((await reach(a.core, "error")).message).toContain("since the comparison");
   expect(tree(a.folder)).toEqual(tree(b.folder));
-});
+}, 10_000);
 
 test("core: files named like things every object has are files like any other", async () => {
   const a = await tandem("Office PC");

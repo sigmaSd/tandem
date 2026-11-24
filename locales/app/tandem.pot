@@ -47,6 +47,14 @@ msgctxt "errBusy"
 msgid "A sync is already running. Wait for it to end."
 msgstr ""
 
+msgctxt "errGuest"
+msgid "{name} is syncing this folder with this computer. Wait for it to end."
+msgstr ""
+
+msgctxt "errBusyThere"
+msgid "{name} is already syncing this folder. Wait for it to end, then try again."
+msgstr ""
+
 msgctxt "errStale"
 msgid "{name} synced with this computer since the comparison. Compare again."
 msgstr ""
@@ -385,6 +393,10 @@ msgstr ""
 
 msgctxt "guestSyncing"
 msgid "{name} is syncing with this computer…"
+msgstr ""
+
+msgctxt "guestSyncingFiles"
+msgid "{name} is syncing with this computer: {done} of {total} files…"
 msgstr ""
 
 msgctxt "statusChecking"

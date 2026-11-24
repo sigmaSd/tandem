@@ -553,7 +553,18 @@ function pairingQr(text: string): HTMLElement {
 function home(): Kid[] {
   return [
     offersCard(),
-    state.guest && h("p", { class: "note" }, t("guestSyncing", { name: state.guest })),
+    state.guest &&
+      h(
+        "p",
+        { class: "note" },
+        state.guestProgress
+          ? t("guestSyncingFiles", {
+              name: state.guest,
+              done: num(Math.min(state.guestProgress[0] + 1, state.guestProgress[1])),
+              total: num(state.guestProgress[1]),
+            })
+          : t("guestSyncing", { name: state.guest }),
+      ),
     ...state.folders.map(folderCard),
     h(
       "div",
@@ -597,7 +608,7 @@ function folderCard(f: FolderView): HTMLElement {
       small("gear", "folderSettings", () => openFolderSettings(f.id)),
     ),
     f.copies.length
-      ? h("div", { class: "card copies" }, ...f.copies.map(copyTile))
+      ? h("div", { class: "card copies" }, ...f.copies.map((c) => copyTile(c, f)))
       : h("p", { class: "sub" }, t("notShared")),
     h(
       "div",
@@ -621,7 +632,7 @@ function folderCard(f: FolderView): HTMLElement {
   );
 }
 
-function copyTile(c: CopyView): HTMLElement {
+function copyTile(c: CopyView, f: FolderView): HTMLElement {
   // the other side doesn't know this computer any more (it was reset or reinstalled, or forgot this one): this
   // pairing can never sync again, so its row offers to forget it rather than a Sync that can't work
   const dead = c.status?.there.known === false && c.status.there.why === "refused";
@@ -659,7 +670,13 @@ function copyTile(c: CopyView): HTMLElement {
       : !c.waiting &&
           h(
             "button",
-            { class: c.available ? "go" : "", onclick: () => act("compare", { id: c.id }) },
+            {
+              class: c.available && !f.guest ? "go" : "",
+              // another computer is syncing this folder with this one: wait for it (the core refuses meanwhile)
+              disabled: !!f.guest,
+              title: f.guest ? t("guestSyncing", { name: f.guest }) : undefined,
+              onclick: () => act("compare", { id: c.id }),
+            },
             t("sync"),
           ),
   );

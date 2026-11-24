@@ -199,6 +199,11 @@ button {
 button:hover {
   background: var(--hover);
 }
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+  background: transparent;
+}
 button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,

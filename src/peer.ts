@@ -11,6 +11,9 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { ChangedError, CHUNK } from "./store.ts";
 import { NameError } from "./names.ts";
+
+/** The folder is being synced with another computer right now: ask again once that sync is over. */
+export class BusyError extends Error {}
 import {
   derive,
   ephemeral,
@@ -275,7 +278,14 @@ export class PeerServer {
       const r = await this.#host.call(session.peer, String(method), args ?? {}, asked.payload);
       answer = pack({ ok: true, r: r.result ?? null }, r.payload);
     } catch (e) {
-      const code = e instanceof ChangedError ? "changed" : e instanceof NameError ? "name" : "error";
+      const code =
+        e instanceof ChangedError
+          ? "changed"
+          : e instanceof NameError
+            ? "name"
+            : e instanceof BusyError
+              ? "busy"
+              : "error";
       answer = pack({ ok: false, code, error: (e as Error).message });
     }
     res.writeHead(200, { "content-type": "application/octet-stream", "cache-control": "no-store" });

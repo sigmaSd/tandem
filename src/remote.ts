@@ -3,7 +3,7 @@
 // other store (src/store.ts): the sync itself works the same on any two stores.
 
 import { cleanRel, NameError } from "./names.ts";
-import { canon, PROTOCOL } from "./peer.ts";
+import { BusyError, canon, PROTOCOL } from "./peer.ts";
 import {
   codeKey,
   derive,
@@ -196,6 +196,7 @@ export class Link {
       if (j.code === "changed") throw new ChangedError(j.error);
       if (j.error === "not shared") throw new Refused("unshared");
       if (j.code === "name") throw new NameError(j.error);
+      if (j.code === "busy") throw new BusyError(j.error);
       throw new Error(j.error ?? "error");
     }
     return { result: j.r, payload: answer.payload };
@@ -297,6 +298,8 @@ export class RemoteStore implements Store {
   ignore = "";
   /** Changes asked for at once (the other computer caps it too). */
   pageSize = 20_000;
+  /** How far the sync under way is, in files: told with every request, for the "is syncing" notice there. */
+  progress: [done: number, total: number] | null = null;
 
   readonly #where: () => { folder: string; from: string };
 
@@ -309,7 +312,8 @@ export class RemoteStore implements Store {
 
   /** Ask about the folder. */
   #call(method: string, args: Record<string, unknown> = {}, payload?: Uint8Array, timeout?: number) {
-    return this.#link.call(method, { ...args, ...this.#where() }, payload, timeout);
+    const progress = this.progress ? { progress: this.progress } : {};
+    return this.#link.call(method, { ...args, ...progress, ...this.#where() }, payload, timeout);
   }
 
   async info(timeout = 8000): Promise<RemoteInfo> {
@@ -440,6 +444,16 @@ export class RemoteStore implements Store {
 
   /** Tell the other computer a sync with it just ended (its window shows the time). */
   async synced() {
+    this.progress = null;
     await this.#call("synced").catch(() => {});
+  }
+
+  /**
+   * Tell the other computer a comparison or sync with it ended without syncing (cancelled, closed, failed):
+   * its "is syncing" notice goes at once. A Tandem before 0.3.6 doesn't know it, and drops the notice by itself.
+   */
+  async left() {
+    this.progress = null;
+    await this.#call("left").catch(() => {});
   }
 }

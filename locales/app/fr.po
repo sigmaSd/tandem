@@ -47,6 +47,14 @@ msgctxt "errBusy"
 msgid "A sync is already running. Wait for it to end."
 msgstr "Une synchronisation est déjà en cours. Attendez qu'elle se termine."
 
+msgctxt "errGuest"
+msgid "{name} is syncing this folder with this computer. Wait for it to end."
+msgstr "{name} synchronise ce dossier avec cet ordinateur. Attendez que ce soit terminé."
+
+msgctxt "errBusyThere"
+msgid "{name} is already syncing this folder. Wait for it to end, then try again."
+msgstr "{name} synchronise déjà ce dossier. Attendez que ce soit terminé, puis réessayez."
+
 msgctxt "errStale"
 msgid "{name} synced with this computer since the comparison. Compare again."
 msgstr "{name} s'est synchronisé avec cet ordinateur depuis la comparaison. Comparez de nouveau."
@@ -386,6 +394,10 @@ msgstr "Jamais synchronisé"
 msgctxt "guestSyncing"
 msgid "{name} is syncing with this computer…"
 msgstr "{name} se synchronise avec cet ordinateur…"
+
+msgctxt "guestSyncingFiles"
+msgid "{name} is syncing with this computer: {done} of {total} files…"
+msgstr "{name} se synchronise avec cet ordinateur : {done} fichiers sur {total}…"
 
 msgctxt "statusChecking"
 msgid "Checking…"

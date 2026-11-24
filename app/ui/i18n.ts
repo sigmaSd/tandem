@@ -82,6 +82,7 @@ export const UI_SOURCE = {
   lastSynced: "Last synced {when}",
   neverSynced: "Never synced",
   guestSyncing: "{name} is syncing with this computer…",
+  guestSyncingFiles: "{name} is syncing with this computer: {done} of {total} files…",
   statusChecking: "Checking…",
   stInSync: "In sync",
   stSame: "Same files on both sides",

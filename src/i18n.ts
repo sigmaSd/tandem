@@ -94,6 +94,8 @@ export const CORE_SOURCE = {
   errFolder: "The folder {path} can't be opened: {error}",
   errInsideOwn: "That folder belongs to Tandem itself. Choose another one.",
   errBusy: "A sync is already running. Wait for it to end.",
+  errGuest: "{name} is syncing this folder with this computer. Wait for it to end.",
+  errBusyThere: "{name} is already syncing this folder. Wait for it to end, then try again.",
   errStale: "{name} synced with this computer since the comparison. Compare again.",
   errUnreachable:
     "{name} did not answer. Check that it is on, on the same network, and that Tandem is open there.",

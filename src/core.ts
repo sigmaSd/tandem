@@ -32,7 +32,7 @@ import { DEFAULT_IGNORE, skipper } from "./ignore.ts";
 import type { Entry, Listing } from "./listing.ts";
 import { loadLocales } from "./locales.ts";
 import { cleanRel, isTextName, OWN, stampOf } from "./names.ts";
-import { type Answer, PeerServer } from "./peer.ts";
+import { type Answer, BusyError, PeerServer } from "./peer.ts";
 import { type Action, agreedBase, plan, type Side } from "./plan.ts";
 import type { Translations } from "./po.ts";
 import {
@@ -385,9 +385,11 @@ export class Core {
   #pairTimer?: ReturnType<typeof setTimeout>;
   /** Windows open on this computer (src/server.ts): other computers are asked for news only then. */
   #viewers = 0;
-  /** A paired computer is working in this folder right now. */
-  #guest: string | null = null;
-  #guestTimer?: ReturnType<typeof setTimeout>;
+  /** Paired computers syncing with this one right now, by device id: their name and the folder (its id here). */
+  readonly #guests = new Map<
+    string,
+    { name: string; folder: string; progress: [number, number] | null; timer: ReturnType<typeof setTimeout> }
+  >();
   #locales: Record<string, Translations> = {};
   #lastEmit = 0;
   #emitTimer?: ReturnType<typeof setTimeout>;
@@ -568,7 +570,7 @@ export class Core {
     for (const t of [
       this.#pairTimer,
       this.#emitTimer,
-      this.#guestTimer,
+      ...[...this.#guests.values()].map((g) => g.timer),
       this.#restatusTimer,
       this.#pollSoonTimer,
     ])
@@ -1286,6 +1288,9 @@ export class Core {
     const { folder: f, copy } = this.#find(copyId);
     const name = this.#nameOf(copy);
     if (copy.remote === null) throw new UserError(msg("errWaiting", { name }));
+    // a paired computer is syncing this folder with this one: a comparison now would see it half-written
+    const guest = this.#guestIn(f.id);
+    if (guest) throw new UserError(msg("errGuest", { name: guest.name }));
     this.#work = null;
     this.#cancel = false;
     this.job = { phase: "scanning", copyId, here: [0, 0], there: [0, 0] };
@@ -1323,7 +1328,9 @@ export class Core {
           ),
         );
       }
-      const scans = await Promise.all([this.#rescan(folder, true, here), b.scan("", there)]);
+      const scans = await Promise.all([this.#rescan(folder, true, here), b.scan("", there)]).catch((e) => {
+        throw e instanceof BusyError ? new UserError(msg("errBusyThere", { name })) : e;
+      });
       const theirIgnore = b.ignore;
       const theirBase = await b.loadBase();
       const [scanA, scanB] = scans;
@@ -1363,6 +1370,7 @@ export class Core {
       };
       if (this.#cancel) {
         // cancelled while comparing: back to the start, nothing was touched
+        this.#tellLeft();
         this.#work = null;
         this.job = null;
         return this.changed();
@@ -1388,9 +1396,15 @@ export class Core {
     return act.kind;
   }
 
+  /** The comparison or sync is over without a sync: the other computer is told (src/remote.ts `left`). */
+  #tellLeft() {
+    void this.#work?.b.left();
+  }
+
   #failed(copyId: string, e: Error) {
     if (this.#stopped) return; // stopped under it: nothing to tell
     if (!(e instanceof UserError)) console.error(e);
+    this.#tellLeft();
     this.#work = null;
     this.job = { phase: "error", copyId, message: e.message };
     this.changed();
@@ -1502,6 +1516,7 @@ export class Core {
       stamp: stampOf(now),
       nameB: this.#nameOf(copy),
       progress: (p) => {
+        w.b.progress = [p.done, p.total];
         this.job = { phase: "applying", copyId: copy.id, progress: p };
         this.changed();
       },
@@ -1567,7 +1582,7 @@ export class Core {
       copy.lastSync = now.getTime();
       await this.#save();
       await w.b.synced();
-    }
+    } else await w.b.left();
     this.#work = null;
     this.job = { phase: "done", copyId: copy.id, at: now.getTime(), summary };
     this.changed();
@@ -1584,6 +1599,7 @@ export class Core {
   /** Leave the review, done or error screen. */
   closeJob() {
     if (this.#busy()) return;
+    if (this.job?.phase === "review") this.#tellLeft(); // left without syncing
     this.job = null;
     this.#work = null;
     this.changed();
@@ -1713,6 +1729,8 @@ export class Core {
           live: !!side?.live.live,
           why: side && !side.live.live ? side.live.why : null,
           ignore: f.ignore,
+          /** The paired computer syncing this folder with this one right now: no sync starts here meanwhile. */
+          guest: this.#guestIn(f.id)?.name ?? null,
           copies: f.copies.map((copy) => ({
             id: copy.id,
             name: this.#nameOf(copy),
@@ -1754,7 +1772,10 @@ export class Core {
         .filter((s) => !this.#device(s.id))
         .map((s) => ({ name: s.name, address: s.address, pairing: s.pairing })),
       job: this.job,
-      guest: this.#guest,
+      /** A paired computer syncing with this one right now (the notice on top of the home screen). */
+      guest: this.#guests.values().next().value?.name ?? null,
+      /** How far that computer's sync is, in files ([done, total]), once it is copying. */
+      guestProgress: this.#guests.values().next().value?.progress ?? null,
     };
   }
 
@@ -1765,21 +1786,35 @@ export class Core {
    * when that computer says it is done, or has asked nothing for a few seconds (it was closed, or cancelled):
    * the timer starts again at every request, so it can only fire after the last one.
    */
-  #guestHere(name: string) {
-    if (this.#guest !== name) {
-      this.#guest = name;
-      this.changed();
-    }
-    clearTimeout(this.#guestTimer);
-    this.#guestTimer = setTimeout(() => this.#guestGone(), 4000);
-    this.#guestTimer.unref?.();
+  #guestHere(dev: Device, folder: string, progress: unknown) {
+    const was = this.#guests.get(dev.id);
+    clearTimeout(was?.timer);
+    const timer = setTimeout(() => this.#guestGone(dev.id), 4000);
+    timer.unref?.();
+    // how far its sync is, in files, when it says (a Tandem before 0.3.6 doesn't); null: a new one starts
+    const [done, total] = Array.isArray(progress) ? progress : [];
+    const p: [number, number] | null =
+      Number.isSafeInteger(done) && Number.isSafeInteger(total) && done >= 0 && total > 0
+        ? [Math.min(done, total), total]
+        : progress !== null && was?.folder === folder
+          ? was.progress
+          : null;
+    this.#guests.set(dev.id, { name: dev.name, folder, progress: p, timer });
+    if (was?.folder !== folder || was.name !== dev.name || was.progress?.join() !== p?.join()) this.changed();
   }
 
-  #guestGone() {
-    clearTimeout(this.#guestTimer);
-    if (this.#guest === null) return;
-    this.#guest = null;
+  #guestGone(deviceId: string) {
+    const was = this.#guests.get(deviceId);
+    if (!was) return;
+    clearTimeout(was.timer);
+    this.#guests.delete(deviceId);
     this.changed();
+  }
+
+  /** The paired computer syncing this folder with this one right now, if any. */
+  #guestIn(folder: string) {
+    for (const g of this.#guests.values()) if (g.folder === folder) return g;
+    return undefined;
   }
 
   /**
@@ -1889,6 +1924,11 @@ export class Core {
       this.#pollSoon(0);
       return {};
     }
+    if (method === "left") {
+      // it cancelled, closed its review, or failed: no sync is coming, the notice goes at once
+      this.#guestGone(deviceId);
+      return {};
+    }
     if (method === "status") {
       const scope = this.#db.scope(`folder:${f.id}`);
       return {
@@ -1913,7 +1953,10 @@ export class Core {
     const store = folder.store;
     if (method === "changes") {
       if (args.scan === true) {
-        this.#guestHere(dev.name); // a sync is starting there
+        // this computer is syncing the folder itself: the other one would compare it while it moves
+        if (this.#busy() && f.copies.some((c) => c.id === this.job?.copyId))
+          throw new BusyError(`${this.config.device.name} is already syncing this folder.`);
+        this.#guestHere(dev, f.id, null); // a sync is starting there
         await this.#rescan(folder, true);
       }
       return {
@@ -1924,7 +1967,7 @@ export class Core {
         },
       };
     }
-    this.#guestHere(dev.name);
+    this.#guestHere(dev, f.id, args.progress);
 
     for (const [id, u] of this.#uploads) {
       if (Date.now() - u.at > 30 * 60_000) {
@@ -2032,7 +2075,7 @@ export class Core {
         return {};
       }
       case "synced":
-        this.#guestGone(); // it says it is done: the notice goes at once
+        this.#guestGone(dev.id); // it says it is done: the notice goes at once
         copy.lastSync = Date.now();
         await this.#save();
         this.changed();
