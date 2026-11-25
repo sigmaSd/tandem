@@ -26,7 +26,9 @@ vp build && vp pack && node vendor/nodeapk/src/cli.ts build . --install
 ```
 
 The release and F-Droid are meant to build the same APK, byte for byte before signing (F-Droid's pipeline
-compares them; up to 0.3.8 they differed in Node): same nodeapk sources (the submodule), same Node. The release takes Node from [node-android](https://github.com/sigmaSd/node-android)'s
+compares them; up to 0.3.9 they differed, in Node and then in the padding signing added): same nodeapk
+sources (the submodule), same Node. The release workflow makes F-Droid's comparison itself before publishing
+(`tools/fdroid-match.py`), except that it doesn't build Node. The release takes Node from [node-android](https://github.com/sigmaSd/node-android)'s
 release; F-Droid builds that release from source with `vendor/node-android` (its `reproduce` workflow checks a
 release rebuilds bit for bit). Updating either means moving its submodule, then releasing.
 

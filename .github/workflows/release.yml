@@ -103,13 +103,52 @@ jobs:
           node vendor/nodeapk/src/cli.ts build . --keystore "$RUNNER_TEMP/tandem.keystore" \
             --out "dist/packages/Tandem-$v-android-arm64.apk"
           rm "$RUNNER_TEMP/tandem.keystore"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: apk
+          path: dist/packages/*.apk
+          if-no-files-found: error
       - name: Attach the APK to the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$GITHUB_REF_NAME" dist/packages/*.apk --clobber
 
+  # The APK built again, unsigned, as F-Droid builds it (but with node-android's published Node), and compared
+  # by F-Droid's own code: what can't match isn't published. Apart from the android job: what pip installs
+  # gets neither the signing key nor a token that can write.
+  fdroid-match:
+    needs: android
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vp build
+      - run: pnpm exec vp pack
+      - run: node vendor/nodeapk/src/cli.ts build . --unsigned --out unsigned.apk
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: apk
+          path: signed
+      - name: F-Droid's comparison
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install -q fdroidserver==2.4.5
+          apksigner=$(find "$HOME/.cache/nodeapk" "$ANDROID_HOME/build-tools" -path '*/35.0.0/apksigner' 2>/dev/null | head -1) || true
+          sha256sum unsigned.apk signed/*.apk
+          PATH="$(dirname "$apksigner"):$PATH" "$RUNNER_TEMP/venv/bin/python" tools/fdroid-match.py signed/*.apk unsigned.apk
+
   publish:
-    needs: [build, android]
+    needs: [build, android, fdroid-match]
     runs-on: ubuntu-24.04
     steps:
       - name: Publish the release, now that every system's packages are in it

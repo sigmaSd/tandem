@@ -1,0 +1,2 @@
+• The app is signed in a way that lets F-Droid ship the same signature as the GitHub releases. Nothing else changes since 0.3.9.
+• Coming from 0.3.8 or older from GitHub: this is a new app to Android (io.github.sigmasd.tandem). Sync one last time in the old one and uninstall it, then pair this one again and choose the same folder. Your files stay where they are.
