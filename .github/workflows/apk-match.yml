@@ -1,0 +1,59 @@
+# One-off test: does an APK signed by nodeapk match the unsigned one F-Droid builds, by F-Droid's own comparison?
+name: apk-match
+on:
+  push:
+    branches: [apk-match]
+permissions:
+  contents: read
+jobs:
+  match:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vp build && pnpm exec vp pack
+      - name: Build unsigned (as F-Droid), signed as 0.3.9 was, and signed with the fixes
+        env:
+          NODEAPK_KEYSTORE_PASSWORD: throwaway-test
+        run: |
+          keytool -genkeypair -keystore t.keystore -alias t -keyalg RSA -keysize 2048 -validity 100 -dname CN=test -storepass $NODEAPK_KEYSTORE_PASSWORD
+          mkdir apks
+          b() { node vendor/nodeapk/src/cli.ts build . "$@"; }
+          b --unsigned --out apks/unsigned.apk
+          b --keystore t.keystore --out apks/old.apk
+          f=vendor/nodeapk/src/android/apk.ts
+          sed -i 's/^      opts.output,\n    \]);//; s/^      "--v4-signing-enabled",$/      "--alignment-preserved",\n      "true",\n      "--v4-signing-enabled",/' $f
+          git -C vendor/nodeapk diff
+          b --keystore t.keystore --out apks/aligned.apk
+          sed -i 's/^      "--alignment-preserved",$/      "--v1-signing-enabled",\n      "false",\n      "--alignment-preserved",/' $f
+          b --keystore t.keystore --out apks/aligned-nov1.apk
+          sha256sum apks/*
+          echo "F-Droid's unsigned 0.3.9: a0ec8d485f8ef28a1383a50ea96ddff659b8be094e541acee91aa4f7426948d8"
+      - name: F-Droid's comparison
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq diffoscope-minimal >/dev/null || true
+          python3 -m venv v && v/bin/pip -q install fdroidserver==2.4.5 || v/bin/pip -q install fdroidserver
+          v/bin/pip list 2>/dev/null | grep -iE "fdroidserver|apksig"
+          export PATH="$(ls -d $HOME/.cache/nodeapk/android-sdk/build-tools/* | tail -1):$PATH"
+          which apksigner
+          cat > cmp.py <<'P'
+          import sys, tempfile, shutil
+          from fdroidserver import common
+          common.config = {'apksigner': shutil.which('apksigner'), 'sdk_path': '', 'keystore': 'x'}
+          for n in ('old', 'aligned', 'aligned-nov1'):
+              with tempfile.TemporaryDirectory() as t:
+                  shutil.copy('apks/unsigned.apk', t + '/u.apk')
+                  try:
+                      r = common.verify_apks(f'apks/{n}.apk', t + '/u.apk', t)
+                  except Exception as e:
+                      r = 'EXC ' + repr(e)
+                  print('RESULT', n, '->', 'MATCHES' if r is None else r, flush=True)
+          P
+          v/bin/python cmp.py
