@@ -1,5 +1,5 @@
 // Tandem on Android, run by nodeapk (~/dev/nodeapk): Node runs this file on the phone (bundled by `vp pack`
-// into dist/app/android.mjs), and the app shows the window it serves in a WebView.
+// into dist/android/android.mjs), and the app shows the window it serves in a WebView.
 //
 // The nodeapk contract: listen on 127.0.0.1 and print one ready line, `nodeapk: <url>`; keep state in
 // NODEAPK_DATA. The folder dialog is Android's folder picker, through the shell (globalThis.nodeapk, which
@@ -17,7 +17,7 @@ interface Nodeapk {
 }
 const nodeapk = (globalThis as { nodeapk?: Nodeapk }).nodeapk;
 
-// the project's root, as on the desktop: this file runs as dist/app/android.mjs
+// the project's root, as on the desktop: this file runs as dist/android/android.mjs
 const APP_DIR = fileURLToPath(new URL("../../", import.meta.url));
 const data = process.env.NODEAPK_DATA;
 if (!data) {

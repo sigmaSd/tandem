@@ -1,6 +1,7 @@
 // The whole toolchain, through Vite+ (`vp`):
 //   vp build   the window's page (app/ui/index.html and its scripts) → app/ui/dist/
-//   vp pack    Electron's main process (everything Tandem does), one file → dist/app/electron.mjs
+//   vp pack    Electron's main process (everything Tandem does), one file → dist/app/electron.mjs, and the
+//              same for the Android app → dist/android/android.mjs
 //   vp check   format (Oxfmt), lint (Oxlint) and type-check (TypeScript 7) — at commit (.vite-hooks/pre-commit)
 //   vp lint    lint and type-check, no formatting: while editing
 //   vp test    the tests (Vitest), tests/*.test.ts
@@ -12,6 +13,16 @@ import { defineConfig } from "vite-plus";
 // fileURLToPath, not .pathname: on Windows that gives "/D:/…"
 const ui = fileURLToPath(new URL("./app/ui/", import.meta.url));
 const pages = ["index"];
+
+const bundle = {
+  format: "esm" as const,
+  platform: "node" as const,
+  target: "node24",
+  clean: true,
+  dts: false,
+  // dependencies bundled in: the package needs no node_modules (Electron itself is the runtime)
+  deps: { alwaysBundle: [/.*/], neverBundle: ["electron"], onlyBundle: false as const },
+};
 
 export default defineConfig({
   root: ui,
@@ -43,16 +54,10 @@ export default defineConfig({
     root: fileURLToPath(new URL(".", import.meta.url)),
     include: ["tests/*.test.ts"],
   },
-  pack: {
-    // android: run by nodeapk's shell on the phone (shell/android/main.ts)
-    entry: { electron: "shell/electron/main.ts", android: "shell/android/main.ts" },
-    outDir: "dist/app",
-    format: "esm",
-    platform: "node",
-    target: "node24",
-    clean: true,
-    dts: false,
-    // dependencies bundled in: the package needs no node_modules (Electron itself is the runtime)
-    deps: { alwaysBundle: [/.*/], neverBundle: ["electron"], onlyBundle: false },
-  },
+  // Apart, each with everything it needs: the APK holds nothing of the desktop app, nor the other way round
+  pack: [
+    { ...bundle, entry: { electron: "shell/electron/main.ts" }, outDir: "dist/app" },
+    // run by nodeapk's shell on the phone
+    { ...bundle, entry: { android: "shell/android/main.ts" }, outDir: "dist/android" },
+  ],
 });

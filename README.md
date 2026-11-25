@@ -47,7 +47,7 @@ Several copies are fine: three computers, four, and so on. Each is synced on its
 - It does not merge two versions of a file into one. "Keep both" puts them side by side in the folder.
 - Empty folders, links and file permissions are not synced.
 - The Android app (`Tandem-…-android-arm64.apk` in each release, Android 9 and later; install it once,
-  later APKs update it) is new: it runs Tandem's core on the phone through
+  later APKs update it, except from 0.3.8 or older: see the 0.3.9 release notes) is new: it runs Tandem's core on the phone through
   [nodeapk](https://github.com/sigmaSd/nodeapk) and pairs by scanning the QR code a computer shows. It can't
   open files in other apps yet, and it syncs only while open, like the desktop app.
 - Updates install themselves only in the AppImage (and on Windows and macOS): an .rpm or .deb says when a new

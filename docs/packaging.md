@@ -25,8 +25,8 @@ The Android APK is built by [nodeapk](https://github.com/sigmaSd/nodeapk) from `
 vp build && vp pack && node vendor/nodeapk/src/cli.ts build . --install
 ```
 
-The release and F-Droid build the same APK, byte for byte before signing: same nodeapk sources (the
-submodule), same Node. The release takes Node from [node-android](https://github.com/sigmaSd/node-android)'s
+The release and F-Droid are meant to build the same APK, byte for byte before signing (F-Droid's pipeline
+compares them; up to 0.3.8 they differed in Node): same nodeapk sources (the submodule), same Node. The release takes Node from [node-android](https://github.com/sigmaSd/node-android)'s
 release; F-Droid builds that release from source with `vendor/node-android` (its `reproduce` workflow checks a
 release rebuilds bit for bit). Updating either means moving its submodule, then releasing.
 

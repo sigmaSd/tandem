@@ -1,0 +1,3 @@
+• New app identity (io.github.sigmasd.tandem): it installs next to an older Tandem from GitHub and doesn't update it. Sync there one last time and uninstall it, then pair this one again and choose the same folder. Your files stay where they are.
+• Adding a copy of a folder, and About, link to Tandem's website, with the downloads for other devices.
+• The app no longer carries the desktop app's code.
