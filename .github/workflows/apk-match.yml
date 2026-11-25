@@ -41,7 +41,8 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq diffoscope-minimal >/dev/null || true
           python3 -m venv v && v/bin/pip -q install fdroidserver==2.4.5 || v/bin/pip -q install fdroidserver
           v/bin/pip list 2>/dev/null | grep -iE "fdroidserver|apksig"
-          export PATH="$(ls -d $HOME/.cache/nodeapk/android-sdk/build-tools/* | tail -1):$PATH"
+          A=$(find "$HOME/.cache/nodeapk" "$ANDROID_HOME/build-tools" -path '*35.0.0/apksigner' 2>/dev/null | head -1)
+          export PATH="$(dirname "$A"):$PATH"
           which apksigner
           cat > cmp.py <<'P'
           import sys, tempfile, shutil
